@@ -1,0 +1,40 @@
+{
+  "title": "IPFS とは何か — ゆっくり解説",
+  "topic": "IPFS (InterPlanetary File System) introduction",
+  "total_duration_s": 32,
+  "scenes": [
+    {
+      "id": "scene01",
+      "duration_s": 10.0,
+      "background": "anime_room.png",
+      "lines": [
+        {"t": 0.5, "speaker": "reimu", "text": "ゆっくりしていってね!今日は IPFS について解説するよ", "rate": "+30%", "pitch": "+6Hz", "voice": "ja-JP-NanamiNeural"},
+        {"t": 4.5, "speaker": "marisa", "text": "ふぅん、IPFS って何だ?", "rate": "+25%", "pitch": "+3Hz", "voice": "ja-JP-KeitaNeural"}
+      ]
+    },
+    {
+      "id": "scene02",
+      "duration_s": 12.0,
+      "background": "cyberspace_nodes.png",
+      "lines": [
+        {"t": 0.8, "speaker": "reimu", "text": "IPFS は分散ファイルシステムなのよ", "rate": "+30%", "pitch": "+6Hz", "voice": "ja-JP-NanamiNeural"},
+        {"t": 4.0, "speaker": "marisa", "text": "中央サーバー無しでデータ共有できるってことか?", "rate": "+25%", "pitch": "+3Hz", "voice": "ja-JP-KeitaNeural"},
+        {"t": 7.5, "speaker": "reimu", "text": "そう!CID というハッシュで世界中どこからでもアクセス可能", "rate": "+30%", "pitch": "+6Hz", "voice": "ja-JP-NanamiNeural"}
+      ]
+    },
+    {
+      "id": "scene03",
+      "duration_s": 10.0,
+      "background": "anime_room.png",
+      "lines": [
+        {"t": 0.5, "speaker": "marisa", "text": "なるほど、ピアツーピアか", "rate": "+25%", "pitch": "+3Hz", "voice": "ja-JP-KeitaNeural"},
+        {"t": 3.5, "speaker": "reimu", "text": "この動画自体も IPFS で公開してるよ!", "rate": "+30%", "pitch": "+6Hz", "voice": "ja-JP-NanamiNeural"},
+        {"t": 7.5, "speaker": "marisa", "text": "便利だぜ!", "rate": "+30%", "pitch": "+5Hz", "voice": "ja-JP-KeitaNeural"}
+      ]
+    }
+  ],
+  "characters": [
+    {"id": "reimu", "pos": "left",  "sprite": "reimu_chibi.png",  "name_jp": "霊夢-like"},
+    {"id": "marisa","pos": "right", "sprite": "marisa_chibi.png", "name_jp": "魔理沙-like"}
+  ]
+}

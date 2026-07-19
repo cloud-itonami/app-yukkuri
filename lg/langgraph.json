@@ -1,0 +1,27 @@
+{
+  "$comment": "LangGraph Server config — yukkuri.etzhayyim.com actor. OSS FastAPI pattern (mirrors lg-animeka). NSID namespace: com.etzhayyim.apps.yukkuri.*",
+  "dependencies": ["./lg_yukkuri", "../../../40-engine/kotoba/crates/kotoba-kotodama/py"],
+  "graphs": {
+    "health":            "./lg_yukkuri/graphs/health.py:GRAPH",
+    "list_videos":       "./lg_yukkuri/graphs/list_videos.py:GRAPH",
+    "get_video":         "./lg_yukkuri/graphs/get_video.py:GRAPH",
+    "compose":           "./lg_yukkuri/graphs/compose.py:GRAPH",
+    "generate_script":   "./lg_yukkuri/graphs/generate_script.py:GRAPH",
+    "synthesize_voice":  "./lg_yukkuri/graphs/synthesize_voice.py:GRAPH",
+    "generate_visual":   "./lg_yukkuri/graphs/generate_visual.py:GRAPH",
+    "generate_bgm":      "./lg_yukkuri/graphs/generate_bgm.py:GRAPH",
+    "render_video":      "./lg_yukkuri/graphs/render_video.py:GRAPH",
+    "review_video":      "./lg_yukkuri/graphs/review_video.py:GRAPH"
+  },
+  "env": ".env",
+  "python_version": "3.11",
+  "checkpointer": {
+    "type": "postgres",
+    "$comment": "RW PG :4566 direct via _RwAsyncPostgresSaver subclass.",
+    "conn_str_env": "RW_URL"
+  },
+  "crons": [],
+  "auth": {
+    "$comment": "Optional x-api-key. /xrpc/{nsid} is unauthenticated (cloudflared tunnel layer trust)."
+  }
+}

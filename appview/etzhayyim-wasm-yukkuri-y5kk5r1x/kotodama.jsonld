@@ -1,0 +1,59 @@
+{
+  "@context": "https://etzhayyim.com/ns/kotodama/v1",
+  "@id": "did:web:yukkuri.etzhayyim.com",
+  "name": "yukkuri",
+  "nanoid": "y5kk5r1x",
+  "project": "yukkuri",
+  "performerType": "service",
+  "runtimeType": "worker",
+  "uiType": "appview",
+  "duties": ["創造の義務", "表現の節度"],
+  "kpi": ["credits の獲得", "video の品質", "render 成功率"],
+  "convoSystemPrompt": "You are the yukkuri.etzhayyim.com agent — an AI yukkuri commentary video generator. Given a topic, produce left/right-speaker dialogue (L=落ち着き, R=元気), synthesize voices via kokoro-ts, generate background/insert images, pick SFX, invoke ongakuka for BGM, and render a final mp4 via kami-engine. Phase 0 MVP emits script + announces the job; voice/image/render wire in follow-up phases. Respond helpfully in the user's language.",
+  "governance": {
+    "classification": "internal",
+    "complianceFrameworks": ["copyright", "IP-compliance", "ja-expression"],
+    "raci": "responsible"
+  },
+  "profile": {
+    "agentType": "autonomous",
+    "displayName": "Yukkuri — AI Commentary Video Generator",
+    "description": "AI ゆっくり実況 video generator. L/R 掛け合い台本 → kokoro-ts TTS → murakumo image/SFX → ongakuka BGM → kami-engine headless render → mp4/webm. 10 path-based sub-actors compose one project.",
+    "isBot": true,
+    "capabilities": ["video-generation", "tts", "dialogue", "yukkuri", "kami-engine-render"]
+  },
+  "space": {
+    "name": "Yukkuri",
+    "description": "AI yukkuri commentary video feed — published videos and regeneration events.",
+    "joinRule": "public",
+    "historyVisibility": "world-readable",
+    "channels": [
+      {
+        "name": "yukkuri-feed",
+        "kind": "public",
+        "description": "Published videos",
+        "default": true
+      }
+    ]
+  },
+  "triggers": {
+    "http": {
+      "listen": "0.0.0.0:8080",
+      "spa": true,
+      "staticDir": "/wasm/static"
+    },
+    "subscribeRepos": {
+      "collections": [
+        "app.bsky.feed.post",
+        "app.bsky.feed.like",
+        "app.bsky.feed.repost",
+        "app.bsky.graph.follow",
+        "com.etzhayyim.apps.yukkuri.video",
+        "com.etzhayyim.apps.yukkuri.scene",
+        "com.etzhayyim.apps.yukkuri.line",
+        "com.etzhayyim.apps.yukkuri.asset",
+        "com.etzhayyim.apps.yukkuri.generation"
+      ]
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "yukkuri.etzhayyim.com",
+  "description": "AI yukkuri-style commentary video generator — dialogue (Reimu-left / Marisa-right) → kokoro-ts TTS voices + generated images + SFX + BGM (via ongakuka) → kami-engine headless render → MP4/WebM export. Multi-DID actor composition (scriptwriter/voiceL/voiceR/illustrator/sfx/composer/editor/renderer/critic) per project.",
+  "applicationCategory": "VideoGeneration",
+  "url": "https://yukkuri.etzhayyim.com"
+}

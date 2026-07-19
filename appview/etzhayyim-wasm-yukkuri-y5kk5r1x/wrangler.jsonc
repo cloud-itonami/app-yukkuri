@@ -1,0 +1,45 @@
+{
+  "name": "kotodama-y5kk5r1x",
+  "main": "svelte/.svelte-kit/cloudflare/_worker.js",
+  "compatibility_date": "2025-03-17",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "nodejs_als"
+  ],
+  "assets": {
+    "directory": "./svelte/.svelte-kit/cloudflare/client",
+    "binding": "ASSETS",
+    "html_handling": "auto-trailing-slash",
+    "not_found_handling": "single-page-application"
+  },
+  "vars": {
+    "APP_ACTOR_HANDLE": "yukkuri",
+    "APP_CAPABILITIES": "[\"video-generation\",\"tts\",\"dialogue\",\"yukkuri\",\"kami-engine-render\"]",
+    "APP_DESCRIPTION": "AI ゆっくり実況 video generator. L/R 掛け合い台本 → kokoro-ts TTS → murakumo image/SFX → ongakuka BGM → kami-engine headless render → mp4/webm. 10 path-based sub-actors compose one project.",
+    "APP_DISPLAY_NAME": "Yukkuri — AI Commentary Video Generator",
+    "APP_EMBED_URL": "https://y5kk5r1x.etzhayyim.com/?embed=1",
+    "APP_FRAMEWORK": "sveltekit-edge-bff",
+    "AGENTGATEWAY_MCP_ROUTER_URL": "https://mcp.etzhayyim.com/xrpc/com.etzhayyim.mcp.message",
+    "APP_NANOID": "y5kk5r1x",
+    "APP_PERFORMER_TYPE": "service",
+    "APP_UI_TYPE": "appview"
+  },
+  "rules": [
+    {
+      "type": "CompiledWasm",
+      "globs": [
+        "**/*.wasm"
+      ]
+    }
+  ],
+  "routes": [
+    {
+      "pattern": "y5kk5r1x.etzhayyim.com/*",
+      "zone_name": "etzhayyim.com"
+    },
+    {
+      "pattern": "yukkuri.etzhayyim.com/*",
+      "zone_name": "etzhayyim.com"
+    }
+  ]
+}

@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>yukkuri_full_pipeline_v1 — Reimu/Marisa Tensor Network</title>
+<style>
+  :root {
+    --bg-canvas: #14161b; --grid: rgba(80,90,110,0.16); --grid-major: rgba(110,125,150,0.22);
+    --bg-node: #232733; --bg-node-h: #2c303d; --bg-header: #303544;
+    --bg-control: #1f2733; --bg-time: #1e2530;
+    --border: #3a3f4d; --border-h: #5a6075; --border-active: #f0d050;
+    --txt: #e8e8ea; --txt-dim: #8088a0; --txt-mid: #aab0c0;
+    /* yukkuri-specific colors */
+    --t-bg:     #50b450;  /* background asset */
+    --t-char:   #ff90b0;  /* character sprite */
+    --t-text:   #ffffff;  /* script text */
+    --t-voice-l:#ff7070;  /* Reimu voice (left) — red */
+    --t-voice-r:#7090ff;  /* Marisa voice (right) — blue */
+    --t-image:  #f0d050;  /* composited frame */
+    --t-cnet:   #50c0d0;  /* SFX/BGM */
+    --t-model:  #b070d0;  /* TTS/LLM model */
+    --t-score:  #e06060;
+    --t-cut:    #80c8ff;  /* final scene mp4 */
+    --t-ctrl:   #6a728a;
+  }
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg-canvas); color: var(--txt); margin: 0;
+               font: 12px/1.4 -apple-system, "Helvetica Neue", sans-serif;
+               overflow: hidden; height: 100%; }
+  .topbar { position: fixed; top:0; left:0; right:0; z-index:50;
+            padding: 8px 16px; background: rgba(20,22,27,0.92);
+            backdrop-filter: blur(6px);
+            border-bottom: 1px solid var(--border); display: flex;
+            align-items: center; gap: 14px; flex-wrap: wrap; }
+  .topbar h1 { font-size: 14px; margin:0; font-weight:600;
+               font-family: ui-monospace, monospace; color:#fff; }
+  .topbar .sub { color: var(--txt-dim); font-size: 11px;
+                 font-family: ui-monospace, monospace; }
+  .topbar select, .topbar button, .topbar a.vbtn {
+    background: var(--bg-node); color: var(--txt); border: 1px solid var(--border);
+    border-radius: 4px; padding: 4px 8px; font-size: 11px;
+    font-family: ui-monospace, monospace; cursor: pointer; text-decoration: none; }
+  .topbar select:hover, .topbar button:hover, .topbar a.vbtn:hover { background: var(--bg-node-h); }
+  .topbar a.vbtn.active { border-color: var(--border-active); color:#fff; }
+  .topbar .legend { display:flex; gap:12px; flex-wrap:wrap;
+                    font-size:10px; color: var(--txt-dim); margin-left:auto; }
+  .topbar .legend i { display: inline-block; width:14px; height:3px;
+                      vertical-align: middle; margin-right:4px; border-radius:2px; }
+  .topbar .legend.dashed i { height:0; border-top: 2px dashed; background:none; }
+
+  .layout { position: absolute; inset: 50px 0 0 0; display: flex; }
+  .sidebar { width: 280px; flex-shrink:0; background:#14141a;
+             border-right: 1px solid var(--border); overflow-y:auto;
+             padding: 8px 0; font-size: 12px; }
+  .sb-title { padding: 4px 12px 8px; font-size:10px;
+              text-transform: uppercase; letter-spacing:0.06em;
+              color: var(--txt-dim); border-bottom: 1px solid var(--border); }
+  .sb-item { display:block; padding: 4px 12px; color: var(--txt-dim);
+             text-decoration:none; cursor:pointer; font-size:11px;
+             white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+             border-left: 2px solid transparent; }
+  .sb-item:hover { background:#1a1a22; color: var(--txt); }
+  .sb-item.active { background:#2a2a33; color: var(--txt);
+                     border-left-color: var(--border-active); }
+
+  .viewport { position: relative; flex:1; overflow:hidden;
+              cursor: grab;
+              background-image:
+                linear-gradient(var(--grid) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+                linear-gradient(var(--grid-major) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-major) 1px, transparent 1px);
+              background-size: 24px 24px, 24px 24px, 120px 120px, 120px 120px; }
+  .viewport.dragging { cursor: grabbing; }
+  .world { position: absolute; left:0; top:0; transform-origin: 0 0; }
+
+  svg.edges { position: absolute; left:0; top:0; overflow: visible; pointer-events: none; }
+  svg.edges path.edge { fill:none; stroke-width:2; opacity:0.85; }
+  svg.edges path.edge.ctrl { stroke-dasharray: 5 4; stroke-width:1.5; opacity:0.55; stroke: var(--t-ctrl); }
+  svg.edges path.edge.cond { stroke-dasharray: 7 4; }
+  svg.edges text.edge-lbl { fill: var(--txt-dim); font: 9px ui-monospace, monospace;
+                             paint-order: stroke; stroke: var(--bg-canvas); stroke-width:3; }
+
+  .node { position: absolute; background: var(--bg-node);
+          border: 1px solid var(--border); border-radius: 8px;
+          overflow: hidden; box-shadow: 0 4px 14px rgba(0,0,0,0.4);
+          transition: border-color .15s; }
+  .node:hover { border-color: var(--border-h); }
+  .node.control { background: var(--bg-control); }
+  .node-h { display: flex; align-items: center; gap:6px;
+            padding: 5px 10px; background: var(--bg-header);
+            font: 600 11px ui-monospace, monospace; color: var(--txt); }
+  .node.control .node-h { background: #2a3548; }
+  .node-h .badge { font-size: 9px; padding: 1px 5px; border-radius: 3px;
+                   background: var(--border); color: var(--txt-mid);
+                   text-transform: uppercase; letter-spacing: 0.04em;
+                   margin-left: auto; }
+  .node-h .badge.send { background:#3a4a66; color:#87b3ff; }
+  .node-h .badge.cond { background:#4a4030; color:#ffd460; }
+  .node-h .badge.ok   { background:#2a4a2a; color:#50b450; }
+  .node-h .badge.warn { background:#4a3a2a; color:#f0a040; }
+  .node-h .badge.bad  { background:#4a2a2a; color:#e07030; }
+  .node-h .badge.crit { background:#4a2020; color:#c84040; }
+  .node-h .badge.voice-l { background:#4a2030; color:#ff8080; }
+  .node-h .badge.voice-r { background:#202a4a; color:#7090ff; }
+  .node-b { padding: 8px 10px; font-size:10px; color: var(--txt-mid);
+            line-height:1.4; font-family: ui-monospace, monospace; word-break:break-word; }
+  .node-img { background: #000; display:block; }
+  .node-img img, .node-img video { display:block; width:100%;
+                                    height:100%; object-fit: contain; cursor:pointer; }
+  .placeholder { display:flex; align-items:center; justify-content:center;
+                 color:#4a4f5d; font-size:10px; font-style:italic;
+                 background: repeating-linear-gradient(45deg,
+                   #1a1d24 0, #1a1d24 6px, #1f222a 6px, #1f222a 12px);
+                 white-space: pre-line; text-align:center; padding: 4px; }
+  .sock { position: absolute; width:10px; height:10px;
+          border-radius: 50%; border: 2px solid var(--bg-canvas);
+          z-index: 3; transform: translate(-50%, -50%); }
+  .sock-l { left:0; } .sock-r { left:100%; }
+  .sock-lbl { position: absolute; font: 9px ui-monospace, monospace;
+              color: var(--txt-dim); white-space: nowrap; pointer-events: none; }
+
+  .lb { position: fixed; inset:0; background: rgba(0,0,0,0.96);
+        display:none; align-items:center; justify-content:center; z-index:200; }
+  .lb.open { display:flex; }
+  .lb img, .lb video { max-width: 95vw; max-height: 95vh; }
+  .lb-close { position:fixed; top:14px; right:22px; color:#fff;
+              font-size:28px; cursor:pointer; user-select:none; }
+  .lb-cap { position:fixed; bottom:14px; left:50%;
+            transform: translateX(-50%); color:#aaa; font-size:11px;
+            font-family: ui-monospace, monospace;
+            background: rgba(0,0,0,0.7); padding: 6px 12px; border-radius:4px; }
+  .hint { position:fixed; bottom:12px; right:16px; z-index:50;
+          color: var(--txt-dim); font-size:10px;
+          font-family: ui-monospace, monospace;
+          background: rgba(20,22,27,0.85); padding: 6px 12px;
+          border: 1px solid var(--border); border-radius:4px; }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>yukkuri_full_pipeline_v1</h1>
+  <span class="sub" id="sub">2-character ゆっくり実況 · IPFS topic · 32s</span>
+  <span class="ctl">scene
+    <select id="scene-sel">
+      <option value="0" selected>scene01 — Intro (10s, anime-room)</option>
+      <option value="1">scene02 — Explanation (12s, cyberspace)</option>
+      <option value="2">scene03 — Outro (10s, anime-room)</option>
+    </select>
+  </span>
+  <span class="ctl">
+    <a class="vbtn" href="/v9-anime.html" title="animeka v9">← anime v9</a>
+    <a class="vbtn active" href="/" title="yukkuri v1">yukkuri v1</a>
+    <a class="vbtn" href="#scene30s" title="32s full yukkuri scene with voice + BGM + MMAudio SFX" id="scene-btn" style="border-color:#5ab0ff;color:#fff;">▶ 32s scene</a>
+    <a class="vbtn" href="#ipfs" title="Show IPFS CIDs" id="ipfs-btn" style="border-color:#50c0d0;color:#a8e0e8;">⌬ IPFS</a>
+  </span>
+  <button id="fit">⤧ fit</button>
+  <button id="reset">⟲ reset</button>
+  <div class="legend">
+    <span><i style="background:var(--t-bg)"></i>bg</span>
+    <span><i style="background:var(--t-char)"></i>char sprite</span>
+    <span><i style="background:var(--t-text)"></i>script</span>
+    <span><i style="background:var(--t-voice-l)"></i>voice-L (Reimu)</span>
+    <span><i style="background:var(--t-voice-r)"></i>voice-R (Marisa)</span>
+    <span><i style="background:var(--t-image)"></i>composite</span>
+    <span><i style="background:var(--t-cnet)"></i>SFX/BGM</span>
+    <span><i style="background:var(--t-cut)"></i>scene mp4</span>
+    <span class="dashed"><i style="border-color:var(--t-ctrl)"></i>control</span>
+  </div>
+</div>
+
+<div class="layout">
+  <aside id="sidebar" class="sidebar">
+    <div class="sb-title">Scenes (3) · 32s total</div>
+    <div id="sb-list"></div>
+    <div class="sb-title" style="margin-top:8px;">11 actor DIDs</div>
+    <div style="padding:6px 12px;font-size:10px;color:var(--txt-dim);line-height:1.6;">
+      <strong style="color:#c8cad4;">controller</strong> &nbsp;<code>did:web:yukkuri.etzhayyim.com</code><br>
+      <strong style="color:#ff9090;">scriptwriter</strong> Murakumo text<br>
+      <strong style="color:#ff7070;">voiceLeft</strong> Reimu — kokoro-ts af_heart / edge-tts Nanami fallback<br>
+      <strong style="color:#7090ff;">voiceRight</strong> Marisa — kokoro-ts am_puck / edge-tts Keita fallback<br>
+      <strong style="color:#ff90b0;">character</strong> kami-character + VRM<br>
+      <strong style="color:#50b450;">illustrator</strong> Murakumo image (Animagine XL)<br>
+      <strong style="color:#50c0d0;">sfx</strong> SFX lib + MMAudio<br>
+      <strong style="color:#b070d0;">composer</strong> ongakuka.compose (cross-actor)<br>
+      <strong style="color:#c8cad4;">editor</strong> timeline + cut + fade + telop<br>
+      <strong style="color:#f0d050;">renderer</strong> kami-engine headless + ffmpeg<br>
+      <strong style="color:#e06060;">critic</strong> 尺/loudness/IP QA
+    </div>
+  </aside>
+  <div class="viewport" id="viewport">
+    <div class="world" id="world">
+      <svg class="edges" id="edges"></svg>
+      <div id="nodes"></div>
+    </div>
+  </div>
+</div>
+
+<div class="hint">drag = pan · wheel = zoom · click image = open</div>
+
+<div class="lb" onclick="this.classList.remove('open')">
+  <div class="lb-close" onclick="event.stopPropagation();document.querySelector('.lb').classList.remove('open');const p=document.getElementById('ipfs-panel');if(p)p.remove()">✕</div>
+  <img id="lbimg" src="" style="display:none">
+  <video id="lbvid" src="" controls style="display:none"></video>
+  <div class="lb-cap" id="lbcap"></div>
+</div>
+
+<script>
+const CONTROL_NODES = [
+  { id:"c_start",       kind:"control", x:    0, y:0, w: 80, h:50, title:"START",         badge:"start" },
+  { id:"c_script",      kind:"control", x:  110, y:0, w:140, h:50, title:"scriptwriter",  badge:"LLM" },
+  { id:"c_voice_l",     kind:"control", x:  280, y:0, w:130, h:50, title:"voiceLeft",     badge:"voice-l" },
+  { id:"c_voice_r",     kind:"control", x:  420, y:0, w:130, h:50, title:"voiceRight",    badge:"voice-r" },
+  { id:"c_character",   kind:"control", x:  560, y:0, w:140, h:50, title:"character",     badge:"VRM" },
+  { id:"c_illustrator", kind:"control", x:  710, y:0, w:140, h:50, title:"illustrator",   badge:"SDXL" },
+  { id:"c_sfx",         kind:"control", x:  860, y:0, w:120, h:50, title:"sfx",           badge:"MMAudio" },
+  { id:"c_composer",    kind:"control", x:  990, y:0, w:140, h:50, title:"composer",      badge:"BGM" },
+  { id:"c_editor",      kind:"control", x: 1140, y:0, w:140, h:50, title:"editor",        badge:"py" },
+  { id:"c_renderer",    kind:"control", x: 1290, y:0, w:140, h:50, title:"renderer",      badge:"ffmpeg" },
+  { id:"c_critic",      kind:"control", x: 1440, y:0, w:120, h:50, title:"critic",        badge:"QA" },
+  { id:"c_end",         kind:"control", x: 1570, y:0, w: 80, h:50, title:"END",           badge:"end" },
+];
+const CONTROL_EDGES = [
+  ["c_start","c_script"], ["c_script","c_voice_l"], ["c_script","c_voice_r"],
+  ["c_script","c_character"], ["c_script","c_illustrator"],
+  ["c_voice_l","c_sfx"], ["c_voice_r","c_sfx"],
+  ["c_sfx","c_composer"], ["c_composer","c_editor"],
+  ["c_character","c_editor"], ["c_illustrator","c_editor"],
+  ["c_editor","c_renderer"], ["c_renderer","c_critic"],
+  ["c_critic","c_renderer", {label:"retake ↺", cond:true, curve:"loop"}],
+  ["c_critic","c_end", {label:"ok"}],
+];
+
+let SCRIPT = null;
+let CIDS = null;
+
+function buildSceneGraph(sceneIdx) {
+  const scene = SCRIPT.scenes[sceneIdx];
+  const TOP = 110;
+  const SCRIPT_X = 0; const BG_X = 290; const CHAR_X = 580;
+  const VOICE_X = 880; const COMP_X = 1180; const SFX_X = 1480; const FINAL_X = 1780;
+  const nodes = []; const edges = []; const ctrlEdges = [];
+
+  // script
+  nodes.push({
+    id: "n_script", kind:"data", x: SCRIPT_X, y: TOP, w: 270, h: 200,
+    title: `script · ${scene.id}`, badge:"TEXT",
+    sub: `topic: ${SCRIPT.topic}\nduration: ${scene.duration_s}s\nlines: ${scene.lines.length} (L/R alternating)\n\n` +
+         scene.lines.map(l => `${l.speaker[0].toUpperCase()}: 「${l.text.slice(0,18)}${l.text.length>18?"…":""}」`).join("\n"),
+    outputs: [
+      { id:"text", name:"script", color:"var(--t-text)" },
+      { id:"plan", name:"plan",   color:"var(--t-text)" },
+    ],
+  });
+
+  // bg
+  nodes.push({
+    id:"n_bg", kind:"data", x: BG_X, y: TOP, w: 260, h: 240,
+    title: `background`, badge:"BG",
+    file: `img/yukkuri-${scene.background.replace(/_/g,"-").replace(".png","")}.png`,
+    sub: `Animagine XL 4.0 (illustrator actor)\n${scene.background}`,
+    inputs: [{id:"plan_in", name:"plan", color:"var(--t-text)"}],
+    outputs: [{id:"img", name:"bg", color:"var(--t-bg)"}],
+  });
+
+  // char sprites — Reimu + Marisa
+  nodes.push({
+    id:"n_reimu", kind:"data", x: CHAR_X, y: TOP, w: 240, h: 180,
+    title: `char · Reimu (L)`, badge:"CHAR",
+    file: "img/yukkuri-reimu-chibi.png",
+    sub: `chibi miko · left position\ncharacter actor + VRM`,
+    inputs: [{id:"plan_in", name:"plan", color:"var(--t-text)"}],
+    outputs: [{id:"img", name:"sprite-L", color:"var(--t-char)"}],
+  });
+  nodes.push({
+    id:"n_marisa", kind:"data", x: CHAR_X, y: TOP + 200, w: 240, h: 180,
+    title: `char · Marisa (R)`, badge:"CHAR",
+    file: "img/yukkuri-marisa-chibi.png",
+    sub: `chibi witch · right position\ncharacter actor + VRM`,
+    inputs: [{id:"plan_in", name:"plan", color:"var(--t-text)"}],
+    outputs: [{id:"img", name:"sprite-R", color:"var(--t-char)"}],
+  });
+
+  // voice lines
+  scene.lines.forEach((line, i) => {
+    const isLeft = line.speaker === "reimu";
+    nodes.push({
+      id: `n_voice_${i}`, kind: "data", x: VOICE_X, y: TOP + i * 100, w: 240, h: 90,
+      title: `L${i} ${isLeft ? "Reimu" : "Marisa"} t+${line.t}s`,
+      badge: isLeft ? "voice-l" : "voice-r",
+      sub: `${line.voice.split("-").pop()}\nrate=${line.rate} pitch=${line.pitch}\n「${line.text.length > 22 ? line.text.slice(0,22)+"…" : line.text}」`,
+      inputs: [{id:"text_in", name:"text", color:"var(--t-text)"}],
+      outputs: [{id:"audio", name:"voice", color: isLeft ? "var(--t-voice-l)" : "var(--t-voice-r)"}],
+    });
+  });
+
+  // composite per-scene mp4
+  const compH = Math.max(240, scene.lines.length * 100);
+  nodes.push({
+    id:"n_comp", kind:"data", x: COMP_X, y: TOP, w: 270, h: compH,
+    title: `composite · ${scene.id}`, badge:"COMP",
+    file: CIDS && CIDS[`yukkuri-${scene.id}.mp4`] ? `img/yukkuri-${scene.id}.mp4` : null,
+    placeholder: `editor + ffmpeg\nbg + char sprites overlay\n+ text bubbles\n+ voice timeline`,
+    sub: `${scene.duration_s}s @ 24fps\nPIL composite + ffmpeg xfade`,
+    inputs: [
+      { id:"bg_in",     name:"bg",        color:"var(--t-bg)" },
+      { id:"chL_in",    name:"sprite-L",  color:"var(--t-char)" },
+      { id:"chR_in",    name:"sprite-R",  color:"var(--t-char)" },
+      ...scene.lines.map((l,i) => ({
+        id:`v_in_${i}`, name:`v${i}`,
+        color: l.speaker==="reimu" ? "var(--t-voice-l)" : "var(--t-voice-r)"
+      })),
+    ],
+    outputs: [{id:"out", name:"scene", color:"var(--t-image)"}],
+  });
+
+  // MMAudio SFX + BGM
+  nodes.push({
+    id:"n_sfx", kind:"data", x: SFX_X, y: TOP, w: 230, h: 150,
+    title: `MMAudio SFX`, badge:"AUDIO",
+    sub: `video-conditioned\nambient room/cyberspace\nfp16 large_44k_v2`,
+    inputs: [{id:"vid_in", name:"video", color:"var(--t-image)"}],
+    outputs: [{id:"sfx", name:"sfx", color:"var(--t-cnet)"}],
+  });
+  nodes.push({
+    id:"n_bgm", kind:"data", x: SFX_X, y: TOP + 170, w: 230, h: 130,
+    title: `BGM (composer actor)`, badge:"BGM",
+    sub: `numpy synth (emotional/calm)\nor ongakuka.compose cross-actor`,
+    outputs: [{id:"bgm", name:"bgm", color:"var(--t-cnet)"}],
+  });
+
+  // final scene mp4
+  nodes.push({
+    id:"n_final", kind:"data", x: FINAL_X, y: TOP, w: 270, h: compH,
+    title: `${scene.id} · final`, badge: "ARTIFACT",
+    file: `img/yukkuri-${scene.id}.mp4`,
+    sub: `mux video + SFX + BGM + voice\n3-layer audio with voice ducking`,
+    inputs: [
+      { id:"v_in",  name:"video", color:"var(--t-image)" },
+      { id:"sfx_in",name:"sfx",   color:"var(--t-cnet)" },
+      { id:"bgm_in",name:"bgm",   color:"var(--t-cnet)" },
+    ],
+  });
+
+  // data edges
+  edges.push(["n_script","plan","n_bg","plan_in"]);
+  edges.push(["n_script","plan","n_reimu","plan_in"]);
+  edges.push(["n_script","plan","n_marisa","plan_in"]);
+  scene.lines.forEach((line, i) => {
+    edges.push(["n_script","text",`n_voice_${i}`,"text_in"]);
+    edges.push([`n_voice_${i}`,"audio","n_comp",`v_in_${i}`]);
+  });
+  edges.push(["n_bg","img","n_comp","bg_in"]);
+  edges.push(["n_reimu","img","n_comp","chL_in"]);
+  edges.push(["n_marisa","img","n_comp","chR_in"]);
+  edges.push(["n_comp","out","n_sfx","vid_in"]);
+  edges.push(["n_comp","out","n_final","v_in"]);
+  edges.push(["n_sfx","sfx","n_final","sfx_in"]);
+  edges.push(["n_bgm","bgm","n_final","bgm_in"]);
+
+  // control → data
+  ctrlEdges.push(["c_script", ["n_script"]]);
+  ctrlEdges.push(["c_voice_l", scene.lines.map((l,i) => l.speaker==="reimu" ? `n_voice_${i}` : null).filter(Boolean)]);
+  ctrlEdges.push(["c_voice_r", scene.lines.map((l,i) => l.speaker==="marisa" ? `n_voice_${i}` : null).filter(Boolean)]);
+  ctrlEdges.push(["c_character", ["n_reimu","n_marisa"]]);
+  ctrlEdges.push(["c_illustrator", ["n_bg"]]);
+  ctrlEdges.push(["c_sfx", ["n_sfx"]]);
+  ctrlEdges.push(["c_composer", ["n_bgm"]]);
+  ctrlEdges.push(["c_editor", ["n_comp"]]);
+  ctrlEdges.push(["c_renderer", ["n_final"]]);
+
+  return { nodes, edges, ctrlEdges };
+}
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c =>
+    ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+}
+window.openLB = function (kind, src, cap) {
+  const lb = document.querySelector(".lb");
+  const img = document.getElementById("lbimg");
+  const vid = document.getElementById("lbvid");
+  if (kind === "video") {
+    img.style.display = "none";
+    vid.style.display = "block"; vid.src = src;
+  } else {
+    vid.style.display = "none"; vid.pause();
+    img.style.display = "block"; img.src = src;
+  }
+  document.getElementById("lbcap").textContent = cap || "";
+  lb.classList.add("open");
+};
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") {
+    document.querySelector(".lb").classList.remove("open");
+    const p = document.getElementById("ipfs-panel"); if (p) p.remove();
+  }
+});
+
+function renderNode(n) {
+  const cls = ["node", n.kind || "data"];
+  const badgeCls = n.badge && /^(send|cond|ok|warn|bad|crit|voice-l|voice-r)$/.test(n.badge)
+    ? n.badge : "";
+  const inputs = (n.inputs || []).map((s, i, arr) => {
+    const y = 32 + (i + 1) * (n.h - 32) / (arr.length + 1);
+    return `<span class="sock sock-l" style="top:${y}px;background:${s.color};"></span>
+            <span class="sock-lbl" style="left:14px;top:${y - 14}px;">${escapeHtml(s.name)}</span>`;
+  }).join("");
+  const outputs = (n.outputs || []).map((s, i, arr) => {
+    const y = 32 + (i + 1) * (n.h - 32) / (arr.length + 1);
+    return `<span class="sock sock-r" style="top:${y}px;background:${s.color};"></span>
+            <span class="sock-lbl" style="right:14px;top:${y - 14}px;text-align:right;">${escapeHtml(s.name)}</span>`;
+  }).join("");
+  let body = "";
+  if (n.file) {
+    const isVideo = /\.mp4$/i.test(n.file);
+    const imgH = n.h - 32 - (n.sub ? 36 : 0);
+    body += `<div class="node-img" style="height:${imgH}px;"
+                  onclick="openLB('${isVideo?'video':'image'}','${escapeHtml(n.file)}','${escapeHtml(n.file)}')">
+      ${isVideo ? `<video src="${escapeHtml(n.file)}" muted preload="metadata"></video>` : `<img src="${escapeHtml(n.file)}" loading="lazy">`}
+    </div>`;
+  } else if (n.placeholder) {
+    const imgH = n.h - 32 - (n.sub ? 36 : 0);
+    body += `<div class="node-img placeholder" style="height:${imgH}px;">${escapeHtml(n.placeholder)}</div>`;
+  }
+  if (n.sub) {
+    body += `<div class="node-b" style="white-space:pre-line;">${escapeHtml(n.sub)}</div>`;
+  }
+  return `<div class="${cls.join(" ")}" id="${n.id}"
+               style="left:${n.x}px;top:${n.y}px;width:${n.w}px;height:${n.h}px;">
+    <div class="node-h">${escapeHtml(n.title)}${n.badge ? `<span class="badge ${badgeCls}">${escapeHtml(n.badge)}</span>` : ""}</div>
+    ${body}${inputs}${outputs}
+  </div>`;
+}
+
+function nodeSocketPos(node, sockId, side) {
+  const list = side === "in" ? (node.inputs || []) : (node.outputs || []);
+  const i = list.findIndex(s => s.id === sockId);
+  if (i < 0) return { x: side === "in" ? node.x : node.x + node.w, y: node.y + node.h / 2 };
+  const y = node.y + 32 + (i + 1) * (node.h - 32) / (list.length + 1);
+  return { x: side === "in" ? node.x : node.x + node.w, y };
+}
+function bezierPath(p1, p2, opts = {}) {
+  const dx = Math.max(40, Math.abs(p2.x - p1.x) * 0.5);
+  if (opts.loop) {
+    const top = Math.min(p1.y, p2.y) - 80;
+    return `M ${p1.x} ${p1.y} C ${p1.x + 120} ${top}, ${p2.x - 120} ${top}, ${p2.x} ${p2.y}`;
+  }
+  return `M ${p1.x} ${p1.y} C ${p1.x + dx} ${p1.y}, ${p2.x - dx} ${p2.y}, ${p2.x} ${p2.y}`;
+}
+function renderEdges(nodes, dataEdges, ctrlEdges, ctrlNodeEdges) {
+  const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+  const paths = [];
+  for (const e of ctrlNodeEdges) {
+    const [a, b, opts] = e;
+    const na = byId[a], nb = byId[b]; if (!na || !nb) continue;
+    const p1 = { x: na.x + na.w, y: na.y + na.h / 2 };
+    const p2 = { x: nb.x, y: nb.y + nb.h / 2 };
+    const loop = opts?.curve === "loop";
+    const d = bezierPath(p1, p2, { loop });
+    const lbl = opts?.label
+      ? `<text class="edge-lbl" x="${(p1.x+p2.x)/2}" y="${loop?Math.min(p1.y,p2.y)-65:(p1.y+p2.y)/2-6}" text-anchor="middle">${escapeHtml(opts.label)}</text>`
+      : "";
+    paths.push(`<path class="${opts?.cond ? "edge ctrl cond" : "edge ctrl"}" d="${d}" />${lbl}`);
+  }
+  for (const [aId, aSock, bId, bSock] of dataEdges) {
+    const na = byId[aId], nb = byId[bId]; if (!na || !nb) continue;
+    const p1 = nodeSocketPos(na, aSock, "out"); const p2 = nodeSocketPos(nb, bSock, "in");
+    const outSock = (na.outputs || []).find(s => s.id === aSock);
+    const color = outSock?.color || "var(--txt-dim)";
+    paths.push(`<path class="edge" d="${bezierPath(p1, p2)}" stroke="${color}" />`);
+  }
+  for (const [ctrlId, dataIds] of ctrlEdges) {
+    const nc = byId[ctrlId]; if (!nc) continue;
+    for (const dId of dataIds) {
+      const nd = byId[dId]; if (!nd) continue;
+      const p1 = { x: nc.x + nc.w / 2, y: nc.y + nc.h };
+      const p2 = { x: nd.x + nd.w / 2, y: nd.y };
+      const dy = Math.abs(p2.y - p1.y) * 0.4;
+      paths.push(`<path class="edge ctrl" d="M ${p1.x} ${p1.y} C ${p1.x} ${p1.y + dy}, ${p2.x} ${p2.y - dy}, ${p2.x} ${p2.y}" />`);
+    }
+  }
+  return paths.join("\n");
+}
+
+const state = { scale: 0.55, tx: 40, ty: 40 };
+function applyTransform() {
+  document.getElementById("world").style.transform =
+    `translate(${state.tx}px, ${state.ty}px) scale(${state.scale})`;
+}
+function fitToScreen(bbox) {
+  const vp = document.getElementById("viewport");
+  const w = vp.clientWidth, h = vp.clientHeight; const margin = 40;
+  state.scale = Math.min((w - 2*margin) / bbox.w, (h - 2*margin) / bbox.h, 1);
+  state.tx = margin - bbox.x * state.scale;
+  state.ty = margin - bbox.y * state.scale;
+  applyTransform();
+}
+(function attachPanZoom() {
+  const vp = document.getElementById("viewport");
+  let dragging = false, ox = 0, oy = 0;
+  vp.addEventListener("mousedown", e => {
+    if (e.target.closest(".node-img, .sock, button, select, a")) return;
+    dragging = true; vp.classList.add("dragging");
+    ox = e.clientX - state.tx; oy = e.clientY - state.ty; e.preventDefault();
+  });
+  window.addEventListener("mousemove", e => {
+    if (!dragging) return;
+    state.tx = e.clientX - ox; state.ty = e.clientY - oy; applyTransform();
+  });
+  window.addEventListener("mouseup", () => { dragging = false; vp.classList.remove("dragging"); });
+  vp.addEventListener("wheel", e => {
+    e.preventDefault();
+    const rect = vp.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    const wx = (mx - state.tx) / state.scale; const wy = (my - state.ty) / state.scale;
+    const f = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+    state.scale = Math.max(0.15, Math.min(3, state.scale * f));
+    state.tx = mx - wx * state.scale; state.ty = my - wy * state.scale;
+    applyTransform();
+  }, { passive: false });
+})();
+
+function renderSidebar(active) {
+  document.getElementById("sb-list").innerHTML = SCRIPT.scenes.map((s, i) =>
+    `<a class="sb-item ${i===active?'active':''}" href="#${s.id}" data-idx="${i}">
+       ${s.id} · ${s.duration_s}s · ${s.lines.length}L · ${s.background.replace('.png','')}
+     </a>`).join("");
+}
+function renderAll(idx) {
+  const { nodes, edges, ctrlEdges } = buildSceneGraph(idx);
+  const allNodes = [...CONTROL_NODES, ...nodes];
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for (const n of allNodes) {
+    minX=Math.min(minX,n.x); minY=Math.min(minY,n.y);
+    maxX=Math.max(maxX,n.x+n.w); maxY=Math.max(maxY,n.y+n.h);
+  }
+  const bbox = { x:minX, y:minY, w:maxX-minX, h:maxY-minY };
+  const svg = document.getElementById("edges");
+  svg.setAttribute("width", maxX + 200); svg.setAttribute("height", maxY + 200);
+  svg.innerHTML = renderEdges(allNodes, edges, ctrlEdges, CONTROL_EDGES);
+  document.getElementById("nodes").innerHTML = allNodes.map(n => renderNode(n)).join("");
+  const scene = SCRIPT.scenes[idx];
+  document.getElementById("sub").textContent =
+    `${scene.id} · ${scene.duration_s}s · ${scene.lines.length} lines · bg=${scene.background.replace('.png','')} · ${SCRIPT.title}`;
+  renderSidebar(idx);
+  fitToScreen(bbox);
+}
+
+window.openScene30s = function () {
+  openLB("video", "img/yukkuri-scene-32s.mp4",
+    "32s yukkuri scene · 3 scenes · Reimu/Marisa Q&A · IPFS とは何か · edge-tts + MMAudio + numpy BGM");
+};
+window.openIpfsPanel = async function () {
+  if (!CIDS) {
+    try { CIDS = await (await fetch("img/ipfs-cid-manifest.json")).json(); }
+    catch (e) { alert("manifest load failed: " + e); return; }
+  }
+  const lb = document.querySelector(".lb");
+  document.getElementById("lbimg").style.display = "none";
+  document.getElementById("lbvid").style.display = "none";
+  let p = document.getElementById("ipfs-panel");
+  if (!p) {
+    p = document.createElement("div");
+    p.id = "ipfs-panel";
+    p.style.cssText = "background:rgba(20,22,27,0.97);border:1px solid #50c0d0;border-radius:8px;padding:18px;max-width:90vw;max-height:85vh;overflow:auto;font:11px ui-monospace,monospace;color:#e8e8ea;";
+    p.onclick = e => e.stopPropagation();
+    lb.appendChild(p);
+  }
+  const files = CIDS.files || {};
+  const bundle = CIDS.bundle_cid;
+  const fmt = b => b > 1e6 ? `${(b/1e6).toFixed(1)}MB` : `${(b/1024).toFixed(0)}KB`;
+  const row = (n,i) => `<tr>
+    <td style="padding:4px 8px;color:#a8c8ff;">${escapeHtml(n)}</td>
+    <td style="padding:4px 8px;color:var(--txt-dim);font-size:10px;">${fmt(i.size)}</td>
+    <td style="padding:4px 8px;font-size:10px;"><a href="https://ipfs.io/ipfs/${i.cid}" target="_blank" style="color:#50c0d0;text-decoration:none;">${i.cid.slice(0,18)}…${i.cid.slice(-6)}</a></td>
+    <td style="padding:4px 8px;"><button onclick="navigator.clipboard.writeText('${i.cid}');this.textContent='✓'" style="background:#1f2733;color:#a8e0e8;border:1px solid #3a4a5a;border-radius:3px;padding:2px 8px;font:10px ui-monospace,monospace;cursor:pointer;">copy</button></td>
+  </tr>`;
+  const videos = Object.entries(files).filter(([_,v]) => v.kind === "video").sort();
+  const images = Object.entries(files).filter(([_,v]) => v.kind === "image").sort();
+  p.innerHTML = `
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;border-bottom:1px solid var(--border);padding-bottom:8px;">
+      <h2 style="margin:0;color:#fff;font-size:14px;">⌬ IPFS CIDs — yukkuri v1 outputs</h2>
+      <span style="color:var(--txt-dim);">${videos.length} videos · ${images.length} assets</span>
+      <button onclick="document.querySelector('.lb').classList.remove('open');this.closest('#ipfs-panel').remove()" style="margin-left:auto;background:#2a2a33;color:#e8e8ea;border:0;border-radius:3px;padding:4px 10px;cursor:pointer;">close</button>
+    </div>
+    ${bundle ? `<div style="margin-bottom:10px;padding:8px;background:#1a2330;border-radius:4px;">
+      <strong style="color:#a8e0e8;">Bundle CID (whole dir)</strong><br>
+      <a href="https://ipfs.io/ipfs/${bundle}" target="_blank" style="color:#50c0d0;font-size:11px;">https://ipfs.io/ipfs/${bundle}</a>
+      <button onclick="navigator.clipboard.writeText('${bundle}');this.textContent='✓'" style="margin-left:8px;background:#1f2733;color:#a8e0e8;border:1px solid #3a4a5a;border-radius:3px;padding:2px 8px;font:10px ui-monospace,monospace;cursor:pointer;">copy</button>
+    </div>` : ""}
+    <h3 style="font-size:12px;color:#fff;margin:14px 0 6px;">Videos (${videos.length})</h3>
+    <table style="border-collapse:collapse;width:100%;">${videos.map(([n,i]) => row(n,i)).join("")}</table>
+    <h3 style="font-size:12px;color:#fff;margin:14px 0 6px;">Assets (${images.length})</h3>
+    <table style="border-collapse:collapse;width:100%;">${images.map(([n,i]) => row(n,i)).join("")}</table>`;
+  lb.classList.add("open");
+};
+document.addEventListener("click", e => {
+  if (e.target.closest("#scene-btn"))  { e.preventDefault(); openScene30s(); return; }
+  if (e.target.closest("#ipfs-btn"))   { e.preventDefault(); openIpfsPanel(); return; }
+  const a = e.target.closest(".sb-item");
+  if (a) { e.preventDefault();
+    document.getElementById("scene-sel").value = a.dataset.idx;
+    navigate(+a.dataset.idx); }
+});
+
+function getSceneFromHash() {
+  const m = location.hash.match(/^#scene(\d+)/);
+  if (!m) return null;
+  const n = parseInt(m[1], 10) - 1;
+  return n >= 0 && n < SCRIPT.scenes.length ? n : null;
+}
+function navigate(idx) {
+  const sel = document.getElementById("scene-sel");
+  sel.value = String(idx);
+  const tag = `#${SCRIPT.scenes[idx].id}`;
+  if (location.hash !== tag) history.replaceState(null, "", tag);
+  document.title = `yukkuri v1 — ${SCRIPT.scenes[idx].id}`;
+  renderAll(idx);
+}
+
+(async function init() {
+  SCRIPT = await (await fetch("yukkuri_scene_script.json")).json();
+  try { CIDS = await (await fetch("img/ipfs-cid-manifest.json")).json(); } catch {}
+  const sel = document.getElementById("scene-sel");
+  const initial = getSceneFromHash() ?? 0;
+  sel.value = String(initial);
+  sel.addEventListener("change", () => navigate(+sel.value));
+  document.getElementById("fit").addEventListener("click", () => renderAll(+sel.value));
+  document.getElementById("reset").addEventListener("click", () => {
+    state.scale = 1; state.tx = 0; state.ty = 0; applyTransform();
+  });
+  window.addEventListener("hashchange", () => {
+    const s = getSceneFromHash();
+    if (s !== null && +sel.value !== s) navigate(s);
+  });
+  navigate(initial);
+})();
+</script>
+</body>
+</html>

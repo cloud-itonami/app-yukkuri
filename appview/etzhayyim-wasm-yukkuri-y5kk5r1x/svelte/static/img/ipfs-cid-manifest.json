@@ -1,0 +1,48 @@
+{
+  "generated_at": 1779768238,
+  "project": "yukkuri",
+  "topic": "IPFS とは何か",
+  "files": {
+    "yukkuri-anime-room.png": {
+      "cid": "bafybeigdqnbrlxi7yklrpc5n72ne3b5meudkift64frlxqtlwhevdp7mvy",
+      "size": 1268659,
+      "kind": "image"
+    },
+    "yukkuri-cyberspace-nodes.png": {
+      "cid": "bafybeier3wqafeexvrimdizb2snw4mbrrm2nlh5rpweionbgpty66pu2da",
+      "size": 1869567,
+      "kind": "image"
+    },
+    "yukkuri-marisa-chibi.png": {
+      "cid": "bafybeiczmsm3yzojgt6nhjnslmaeccra2jjjus6zmdhlssmeopqb34geeq",
+      "size": 585350,
+      "kind": "image"
+    },
+    "yukkuri-reimu-chibi.png": {
+      "cid": "bafybeich2ljldiv2s4esktuxoefk7vaseizqhxw6azzjos7wt3s3kyl4qa",
+      "size": 1105511,
+      "kind": "image"
+    },
+    "yukkuri-scene-32s.mp4": {
+      "cid": "bafybeiews4nhvgylskpvft5t4ml2x4464wtuytn2bbp4t5y6m675msbwae",
+      "size": 3097764,
+      "kind": "video"
+    },
+    "yukkuri-scene01.mp4": {
+      "cid": "bafybeibtac7ooq6p2jrr4fstgk2lzging4x5byr56dusjrpy77jvkr4bmu",
+      "size": 623467,
+      "kind": "video"
+    },
+    "yukkuri-scene02.mp4": {
+      "cid": "bafybeigpsagyx73b6wgzu3ezhkegzxpzssorvsp5wusiarihywaerh7gxm",
+      "size": 1535559,
+      "kind": "video"
+    },
+    "yukkuri-scene03.mp4": {
+      "cid": "bafybeiba7swqji4trbm5iobqxwe5pqjbqasrwsldnhxv7fxffioqyi6hem",
+      "size": 622855,
+      "kind": "video"
+    }
+  },
+  "bundle_cid": "bafybeifpvbhredddr6eadpa74rx2my55x27ti3mfhhxq745k2eq3yiqimi"
+}
