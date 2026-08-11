@@ -1,1 +1,6 @@
-{:schema "etzhayyim.repository/readme-v1" :name "com-etzhayyim-app-yukkuri" :kind :application :source "etzhayyim/root/60-apps/etzhayyim-project-yukkuri"}
+{:schema "etzhayyim.repository/readme-v1"
+ :name "app-yukkuri"
+ :kind :application
+ :source "etzhayyim/root/60-apps/etzhayyim-project-yukkuri"
+ :boundary {:role :commentary-video-generation-application
+            :production-service "cloud-itonami/yukkuri"}}
