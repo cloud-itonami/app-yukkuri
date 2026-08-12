@@ -20,6 +20,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pyright>=1.1.300",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.24",
 ]
 
 [build-system]
@@ -32,3 +34,7 @@ build-backend = "hatchling.build"
 packages = [
     "lg_yukkuri",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "strict"
