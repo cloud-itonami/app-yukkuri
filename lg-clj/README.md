@@ -73,6 +73,6 @@ not need to reproduce to be faithful to the registered graph set.
 ## Run
 
 ```bash
-bb test            # clojure.test suite (run_tests.clj)  → 36 tests / 99 assertions
+bb test            # clojure.test suite (run_tests.clj)  → 40 tests / 115 assertions
 bb run_tests.clj   # same
 ```
