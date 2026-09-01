@@ -12,7 +12,8 @@
   gateway with the fleet allowlist guard (ADR-2605215000) instead of the RunPod
   vLLM proxy. Topic fetch + scene/line inserts go through the injectable store
   seam (kotoba-Datom-log; RisingWave forbidden)."
-  (:require [clojure.string :as str]
+  (:require [lg-yukkuri.compat :as compat]
+            [clojure.string :as str]
             [langgraph.graph :as g]
             [lg-yukkuri.audit :as audit]
             [lg-yukkuri.llm :as llm]
@@ -33,7 +34,7 @@
        "- Keep vocabulary accessible (N3 level)\n- Include 1 surprising fact mid-video\n"
        "- No real person names, no PII\n"))
 
-(defn- now-iso [] (str (java.time.OffsetDateTime/now java.time.ZoneOffset/UTC)))
+(defn- now-iso [] (compat/now-timestamp))
 
 (defn node-fetch-video [state]
   (let [video-id (or (:video_id state) "")]
@@ -45,7 +46,7 @@
                 (if (seq rows)
                   {:topic (or (:topic (first rows)) "") :outline (:outline (first rows))}
                   {}))
-              (catch Exception _ {})))))
+              (catch #?(:clj Exception :cljs :default) _ {})))))
 
 (defn node-llm-script [state]
   (if (:error state)
@@ -91,12 +92,12 @@
           (when (seq vrows)
             (store/insert-row "vertex_yukkuri_video" (assoc (first vrows) :status "script"))))
         {}
-        (catch Exception e {:error (str "insert: " (.getMessage e))})))))
+        (catch #?(:clj Exception :cljs :default) e {:error (str "insert: " (ex-message e))})))))
 
 (defn node-audit [state]
   (audit/emit-audit-bg {:actor (:scriptwriter-did (audit/config-from-state state))
                         :activity "yukkuri.generateScript"
-                        :object-id (str "script:" (or (:video_id state) "") ":" (quot (System/currentTimeMillis) 1000))
+                        :object-id (str "script:" (or (:video_id state) "") ":" (quot (compat/now-ms) 1000))
                         :object-type "yukkuri.script"
                         :attributes {:videoId (:video_id state) :sceneCount (:scene_count state)
                                      :ok (not (boolean (:error state)))}})

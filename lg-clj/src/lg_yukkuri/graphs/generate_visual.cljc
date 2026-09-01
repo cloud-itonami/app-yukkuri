@@ -9,21 +9,22 @@
 
   The image-gen + uploadBlob is the INJECTABLE `*generate-one*` boundary fn
   (murakumo image endpoint + PDS uploadBlob); default uses babashka.http-client.
-  Per-scene generation fans out via `pmap` (clj analogue of asyncio.gather).
+  Per-scene generation fans out via `compat/fan-out` (`pmap` on the JVM, the
+  analogue of the Python asyncio.gather; sequential under ClojureScript).
   Copyright guardrail: a negative prompt is always attached (CLAUDE.md invariant).
   Node name `insert_assets` matches the Python `_build` wiring."
-  (:require #?(:clj [cheshire.core :as json])
+  (:require [lg-yukkuri.compat :as compat]
+            [json.compat :as json]
             [langgraph.graph :as g]
             [lg-yukkuri.audit :as audit]
             [lg-yukkuri.store :as store]))
 (def negative-prompt "real person, celebrity, logo, watermark, nsfw, explicit")
 
-(defn- as-int [v d] (cond (integer? v) v (string? v) (try (Integer/parseInt v) (catch Exception _ d)) :else d))
+(defn- as-int [v d] (compat/->int v d))
 (defn- clip [s n] (let [s (str s)] (subs s 0 (min n (count s)))))
 
 (defn- token-hex [n]
-  (let [bs (byte-array n)] (.nextBytes (java.security.SecureRandom.) bs)
-    (apply str (map #(format "%02x" %) bs))))
+  (compat/random-hex n))
 
 (defn generate-one-with
   "Default `*generate-one*`: image generation + uploadBlob for one scene."
@@ -35,7 +36,6 @@
   (try
     (let [{:keys [image-url pds-blob-url]} (merge audit/graph-defaults host-config)
           image-url (clojure.string/replace image-url #"/+$" "")
-          b64dec   (java.util.Base64/getDecoder)
           prompt   (str "anime style background, " (:location scene) ", " (:action scene)
                         ", soft colors, 2D illustration")
           r (http-post image-url {:headers {"Content-Type" "application/json"} :throw false
@@ -48,13 +48,13 @@
         (let [b64 (get-in (json/parse-string (:body r) true) [:data 0 :b64_json] "")]
           (if (empty? b64)
             {:scene_index (:scene_index scene) :error "empty b64"}
-            (let [img (.decode b64dec ^String b64)
+            (let [img (compat/base64-decode b64)
                   ub  (http-post pds-blob-url {:headers {"Content-Type" "image/png"} :throw false :body img})]
               (if (>= (:status ub) 400)
                 {:scene_index (:scene_index scene) :error (str "uploadBlob " (:status ub))}
                 {:scene_index (:scene_index scene)
                  :blob_key (get-in (json/parse-string (:body ub) true) [:blob :ref :$link] "")}))))))
-    (catch Exception e {:scene_index (:scene_index scene) :error (clip (.getMessage e) 200)})))
+    (catch #?(:clj Exception :cljs :default) e {:scene_index (:scene_index scene) :error (clip (ex-message e) 200)})))
   )
 
 (def ^:dynamic *generate-one* nil)
@@ -70,7 +70,7 @@
     (if (= "" video-id)
       {:error "video_id required"}
       (try {:scenes (fetch-scenes video-id)}
-           (catch Exception e {:error (str "fetch: " (clip (.getMessage e) 180))})))))
+           (catch #?(:clj Exception :cljs :default) e {:error (str "fetch: " (clip (ex-message e) 180))})))))
 
 (defn node-generate [state]
   (if (:error state)
@@ -82,7 +82,7 @@
           (when-not (fn? *generate-one*)
             (throw (ex-info "generateVisual requires an explicit generation capability"
                             {:capability :yukkuri/generate-one})))
-          (let [ok (vec (remove :error (doall (pmap *generate-one* scenes))))]
+          (let [ok (vec (remove :error (compat/fan-out *generate-one* scenes)))]
             {:visual_assets ok :generated_count (count ok)}))))))
 
 (defn node-insert-assets [state]
@@ -90,7 +90,7 @@
     {}
     (let [illustrator-did (:illustrator-did (audit/config-from-state state))
           video-id (or (:video_id state) "")
-          created  (str (java.time.OffsetDateTime/now java.time.ZoneOffset/UTC))]
+          created  (compat/now-timestamp)]
       (try
         (doseq [asset (:visual_assets state)]
           (store/insert-row "vertex_yukkuri_asset"
@@ -100,12 +100,12 @@
                              :meta_json (str "{\"sceneIndex\":" (:scene_index asset) "}")
                              :created_at created}))
         {}
-        (catch Exception e {:error (str "insert: " (clip (.getMessage e) 280))})))))
+        (catch #?(:clj Exception :cljs :default) e {:error (str "insert: " (clip (ex-message e) 280))})))))
 
 (defn node-audit [state]
   (audit/emit-audit-bg {:actor (:illustrator-did (audit/config-from-state state))
                         :activity "yukkuri.generateVisual"
-                        :object-id (str "visual:" (or (:video_id state) "") ":" (quot (System/currentTimeMillis) 1000))
+                        :object-id (str "visual:" (or (:video_id state) "") ":" (quot (compat/now-ms) 1000))
                         :object-type "yukkuri.asset"
                         :attributes {:videoId (:video_id state) :count (or (:generated_count state) 0)}})
   {})

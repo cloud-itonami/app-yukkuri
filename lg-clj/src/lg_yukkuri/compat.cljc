@@ -1,0 +1,130 @@
+(ns lg-yukkuri.compat
+  "The four host facts every graph needs, written once for both runtimes.
+
+  Until 2026-09-01 every namespace here carried a `.cljc` suffix and reached
+  for `System/currentTimeMillis`, `java.time.*`, `Integer/parseInt` and
+  `(.getName (class e))` without a reader conditional, so the sources claimed
+  a portability no runtime had ever checked -- `bb test` was the only thing
+  that ever ran them and babashka is a JVM. Loading `lg-yukkuri.audit` under
+  ClojureScript failed outright.
+
+  The rule these functions exist to keep: a host difference is spelled ONCE,
+  in this namespace, where both branches sit on adjacent lines and a reviewer
+  can see them disagree. Spreading `#?(:clj ...)` across ten graph files is
+  how the `:default nil` branches in `llm/parse-json-object` and
+  `render-video/json-parse` survived -- each one was locally plausible and
+  globally a silent wrong answer."
+  (:require [clojure.string :as str]))
+
+(defn now-ms
+  "Wall clock in milliseconds since the epoch. Audit object-ids derive from it."
+  []
+  #?(:clj (System/currentTimeMillis)
+     :cljs (.getTime (js/Date.))))
+
+(defn now-nanos
+  "Monotonic-ish nanosecond counter, used only for latency DIFFERENCES.
+
+  Do not read an absolute value out of this: the JVM branch is
+  `System/nanoTime`, whose origin is arbitrary, and the ClojureScript branch
+  is millisecond-resolution wall clock scaled up. Differences are comparable
+  within one runtime; the two runtimes' absolute values are not."
+  []
+  #?(:clj (System/nanoTime)
+     :cljs (* 1000000 (.getTime (js/Date.)))))
+
+(defn now-iso
+  "`yyyy-MM-ddTHH:mm:ssZ` -- the format `lg/lg_yukkuri/graphs/health.py`
+  emits, to the second, with no fractional part."
+  []
+  #?(:clj (.format (java.time.format.DateTimeFormatter/ofPattern "yyyy-MM-dd'T'HH:mm:ss'Z'")
+                   (java.time.ZonedDateTime/now java.time.ZoneOffset/UTC))
+     :cljs (str/replace (.toISOString (js/Date.)) #"\.\d{3}Z$" "Z")))
+
+(defn now-timestamp
+  "A full ISO-8601 instant, used for the `created` / `created_at` columns.
+
+  PRECISION IS HOST-DEPENDENT and always has been: the JVM branch is
+  `OffsetDateTime/now` (microseconds on macOS), the ClojureScript branch is
+  `toISOString` (milliseconds). Both are valid ISO-8601 and both sort
+  correctly as strings; do not assert on the fractional digits."
+  []
+  #?(:clj (str (java.time.OffsetDateTime/now java.time.ZoneOffset/UTC))
+     :cljs (.toISOString (js/Date.))))
+
+(defn ex-type-name
+  "A stable-ish name for the class of a caught error, for the `errorType` field
+  of a /runs response. The two runtimes DISAGREE on the value (`java.lang...`
+  vs a JavaScript constructor name); nothing may branch on it."
+  [e]
+  #?(:clj (.getName (class e))
+     :cljs (or (some-> e .-constructor .-name) (pr-str (type e)))))
+
+(defn base64-decode
+  "Decode standard base64 to opaque bytes, for handing straight to the HTTP
+  POST capability as a request body.
+
+  THE RETURN TYPE DIFFERS BY HOST -- `byte[]` on the JVM, `Buffer` (or
+  `Uint8Array` where `Buffer` is absent) under ClojureScript. Nothing may
+  inspect it; the only supported use is passing it to the injected
+  `http-post` as `:body`, which is what `generate-visual` does with the
+  `b64_json` an image model returns."
+  [s]
+  #?(:clj (.decode (java.util.Base64/getDecoder) ^String s)
+     :cljs (if (exists? js/Buffer)
+             (js/Buffer.from s "base64")
+             (let [bin (js/atob s)
+                   n   (.-length bin)
+                   out (js/Uint8Array. n)]
+               (dotimes [i n] (aset out i (.charCodeAt bin i)))
+               out))))
+
+(defn fan-out
+  "Apply `f` to every element of `xs`, eagerly, returning a vector.
+
+  The JVM branch is `pmap`, matching the `asyncio.gather` the Python graphs
+  use to issue per-scene image and per-line TTS requests concurrently.
+  ClojureScript has no `pmap` -- and, being single-threaded, no honest
+  equivalent -- so the ClojureScript branch is sequential.
+
+  THE RESULTS ARE THE SAME AND IN THE SAME ORDER; only wall-clock differs.
+  `pmap` preserves input order, so no caller may depend on completion order
+  in either runtime. Nothing here is a correctness difference, which is why
+  it can be spelled once instead of forking the graphs."
+  [f xs]
+  #?(:clj (vec (doall (pmap f xs)))
+     :cljs (mapv f xs)))
+
+(defn random-hex
+  "`n` cryptographically random bytes as 2n lowercase hex characters.
+
+  Three graph files each carried their own `token-hex` over
+  `java.security.SecureRandom`; they generate the rkey suffix of a video /
+  visual / bgm record, so a weaker generator on one host would collide
+  records rather than fail. Both branches are CSPRNGs: `SecureRandom` on the
+  JVM, WebCrypto's `getRandomValues` (a global since Node 19, and in every
+  browser) on ClojureScript.
+
+  `format \"%02x\"` treats a Java Byte as unsigned 8-bit; `Uint8Array`
+  elements already are, so the two agree on the -128..-1 range where a naive
+  port would emit `ffffffXX`."
+  [n]
+  #?(:clj (let [bs (byte-array n)]
+            (.nextBytes (java.security.SecureRandom.) bs)
+            (apply str (map #(format "%02x" %) bs)))
+     :cljs (let [bs (js/Uint8Array. n)]
+             (js/crypto.getRandomValues bs)
+             (apply str (map #(.padStart (.toString % 16) 2 "0") (array-seq bs))))))
+
+(defn ->int
+  "Parse `v` to an integer, falling back to `d`.
+
+  Replaces `(try (Integer/parseInt v) (catch Exception _ d))`, which was the
+  same expression in six graph files. `parse-long` returns nil rather than
+  throwing, so the fallback is a `or` instead of a catch -- and unlike
+  `Integer/parseInt` it does not accept a leading `+` differently per host."
+  [v d]
+  (cond
+    (integer? v) v
+    (string? v)  (or (parse-long (str/trim v)) d)
+    :else        d))

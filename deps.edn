@@ -1,0 +1,18 @@
+{;; Repo-root entry point for the clj/cljs twin under `lg-clj/`.
+ ;;
+ ;; The tree itself, its dependency pins and its `:paths` live in
+ ;; `lg-clj/deps.edn`; this file reaches them through `:local/root` rather than
+ ;; restating them, so there is exactly one place a dependency sha is written.
+ ;;
+ ;;   clojure -M:test                       the whole suite, JVM
+ ;;   cd lg-clj && clojure -M:test          the same, from inside the tree
+ ;;
+ ;; The ClojureScript half runs from inside `lg-clj/` (see `lg-clj/run-tests.cljs`);
+ ;; nbb takes a classpath rather than a deps.edn, so it has no root form.
+ :paths []
+ :deps {cloud-itonami/lg-yukkuri {:local/root "lg-clj"}}
+ :aliases
+ {:test {:extra-paths ["lg-clj/test"]
+         :extra-deps {io.github.cognitect-labs/test-runner
+                      {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+         :main-opts ["-m" "cognitect.test-runner" "-d" "lg-clj/test"]}}}

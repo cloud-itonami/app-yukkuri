@@ -9,17 +9,15 @@
   Creates a vertex_yukkuri_video row (status='queued') via the INJECTABLE
   `store/*insert-row*` seam. The CF Worker onCommit handler picks it up and
   drives generate_script. `insert` short-circuits when `validate` set :error."
-  (:require [clojure.string :as str]
+  (:require [lg-yukkuri.compat :as compat]
+            [clojure.string :as str]
             [langgraph.graph :as g]
             [lg-yukkuri.audit :as audit]
             [lg-yukkuri.store :as store]))
 
-(defn- now-iso [] (str (java.time.OffsetDateTime/now java.time.ZoneOffset/UTC)))
+(defn- now-iso [] (compat/now-timestamp))
 
-(defn- token-hex [n]
-  (let [bs (byte-array n)]
-    (.nextBytes (java.security.SecureRandom.) bs)
-    (apply str (map #(format "%02x" %) bs))))
+(defn- token-hex [n] (compat/random-hex n))
 
 (defn node-validate [state]
   (let [topic (str/trim (or (:topic state) ""))]
@@ -45,12 +43,12 @@
                            :title title :topic topic :outline outline
                            :status "queued" :created_at created})
         {:video_id rkey :video_uri vid}
-        (catch Exception e {:error (str "insert: " (.getMessage e))})))))
+        (catch #?(:clj Exception :cljs :default) e {:error (str "insert: " (ex-message e))})))))
 
 (defn node-audit [state]
   (audit/emit-audit-bg {:actor (:app-did (audit/config-from-state state))
                         :activity "yukkuri.compose"
-                        :object-id (str "video:" (or (:video_id state) "") ":" (quot (System/currentTimeMillis) 1000))
+                        :object-id (str "video:" (or (:video_id state) "") ":" (quot (compat/now-ms) 1000))
                         :object-type "yukkuri.video"
                         :attributes {:videoId (:video_id state)
                                      :topic (let [t (or (:topic state) "")] (subs t 0 (min 100 (count t))))

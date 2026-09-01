@@ -18,6 +18,7 @@
   The Python FastAPI server (`lg/`) remains the DEPLOYED runtime and COEXISTS."
   (:require [clojure.string :as str]
             [langgraph.graph :as g]
+            [lg-yukkuri.compat :as compat]
             [lg-yukkuri.graphs.health :as health]
             [lg-yukkuri.graphs.list-videos :as list-videos]
             [lg-yukkuri.graphs.get-video :as get-video]
@@ -56,13 +57,21 @@
    "com.etzhayyim.apps.yukkuri.reviewVideo"     "review_video"})
 
 (defn camel->snake
-  "Mirror of server._camel_to_snake: insert _ before inner uppercase, lower-case."
+  "Mirror of server._camel_to_snake: insert _ before inner uppercase, lower-case.
+
+  `Character/isUpperCase` is a JVM static and has no ClojureScript analogue, so
+  the test is written on the character itself: a one-character string is upper
+  case when it differs from its own lower-casing. That is true for A-Z, and for
+  the accented Latin the NSID grammar does not admit either; it is false for
+  digits, `_` and CJK, which is the behaviour `_camel_to_snake` relies on."
   [s]
   (let [s (name s)]
     (apply str (map-indexed (fn [i ch]
-                              (if (and (pos? i) (Character/isUpperCase ch))
-                                (str "_" (Character/toLowerCase ch))
-                                (str (Character/toLowerCase ch))))
+                              (let [c  (str ch)
+                                    lc (str/lower-case c)]
+                                (if (and (pos? i) (not= c lc))
+                                  (str "_" lc)
+                                  lc)))
                             s))))
 
 (defn coerce-xrpc-input
@@ -79,14 +88,15 @@
     nil)))
 
 (defn- run-graph [graph input]
-  (let [started (System/nanoTime)]
+  (let [started (compat/now-nanos)
+        elapsed #(quot (- (compat/now-nanos) started) 1000000)]
     (try
       (let [result (g/invoke graph (or input {}))]
-        {:result result :latencyMs (quot (- (System/nanoTime) started) 1000000)})
-      (catch Exception e
-        {:error (let [m (str (.getMessage e))] (subs m 0 (min 500 (count m))))
-         :errorType (.getName (class e))
-         :latencyMs (quot (- (System/nanoTime) started) 1000000)}))))
+        {:result result :latencyMs (elapsed)})
+      (catch #?(:clj Exception :cljs :default) e
+        {:error (let [m (str (ex-message e))] (subs m 0 (min 500 (count m))))
+         :errorType (compat/ex-type-name e)
+         :latencyMs (elapsed)}))))
 
 (defn ok
   "GET /ok → {:ok true :graphs [...] :version ...}"

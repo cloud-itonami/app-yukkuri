@@ -5,10 +5,10 @@
   The Python posts to the in-cluster bpmn-dispatcher via httpx; here the emit is
   an INJECTABLE dynamic var (`*emit*`) defaulting to a no-op, exactly mirroring
   the Python `LG_AUDIT_DISABLED` path. The default HTTP emitter
-  (`http-emit`) uses babashka.http-client + cheshire and is wired only when a
-  dispatcher URL is configured. Audit is best-effort: failures are swallowed
+  (`http-emit-with`) takes the HTTP POST capability as its first argument and is
+  wired only when a dispatcher URL is configured. Audit is best-effort: failures are swallowed
   (the Python wraps the post in try/except and logs a warning)."
-  (:require #?(:clj [cheshire.core :as json])
+  (:require [json.compat :as json]
             [clojure.string :as str]))
 
 (def default-config
@@ -55,7 +55,7 @@
                      :timeout (long audit-timeout-ms)
                      :body (json/generate-string payload)})
          nil)
-       (catch Exception _ nil)))))
+       (catch #?(:clj Exception :cljs :default) _ nil)))))
 
 (def ^:dynamic *emit*
   "Injectable sink. Default = no-op unless an emitter is wired by deployment.

@@ -1,6 +1,7 @@
 # operator quickstart — app-yukkuri
 
-**この手順は 2026-08-19 に実際に踏んだ結果だけを書いている。**
+**この手順は実際に踏んだ結果だけを書いている**（§1〜§2 と §4 は 2026-09-01、
+§3 は 2026-08-19 に踏んだもの。§3 のコマンドはその後変えていない）。
 踏めなかったもの（appview の build / deploy）は「未検証」と明記して分けてある
 ——「まだ動かしていない」と「動いた」を同じ顔で並べない。
 
@@ -48,21 +49,37 @@ git worktree add -b <branch> /tmp/<name> cloud-itonami/main
 ## 2. clj twin のテストを通す（いちばん短い緑）
 
 ```bash
-cd lg-clj
-bb test
+nbb run-tests.cljs          # repo ルートで。両方の runtime を回す
 ```
 
-実測 2026-08-19:
+実測 2026-09-01:
 
 ```
-Testing lg-yukkuri.smoke-test
-
-Ran 40 tests containing 115 assertions.
-0 failures, 0 errors.
+lg-yukkuri: both runtimes agree -- 44 tests, 141 assertions, 0 failures, 0 errors
 ```
 
-外部サービスは一切要らない。`bb.edn` が `langchain-clj` / `langgraph-clj` を
-git SHA で pin しているので、初回だけ git fetch が走る。
+外部サービスは一切要らない。`lg-clj/deps.edn` が `langgraph` / `langchain` /
+`json` を git SHA で pin しているので、初回だけ git fetch が走る。
+
+**なぜ 2 つ回すのか。** src は全部 `.cljc` だが、2026-09-01 まで**それを読んだ
+runtime は 1 つだけ**だった（`bb test`、babashka は JVM）。だから reader
+conditional の ClojureScript 側は一度も評価されておらず、`lg-yukkuri.audit` は
+cljs では load すらできなかった。より悪いのは load できた 2 つで、
+`llm/parse-json-object` と `render-video/json-parse` は `:default nil` を返す
+——それは「JSON オブジェクトが無かった」の値でもあるので、scriptwriter は
+整形式の応答すべてに fail-closed し、それをモデルのせいとして報告する。
+どのテストも赤くならなかった。**片方だけ回すコマンドはこの種の欠陥を見られない。**
+
+片方ずつ回したいときは:
+
+```bash
+clojure -M:test                                                    # JVM だけ
+cd lg-clj && nbb --classpath "src:test:$(clojure -Spath -M:test)" run-tests.cljs   # cljs だけ
+```
+
+`lg-clj/run-tests.cljs` は **3 値の exit** を返す（0 = 全部通った / 1 = 落ちた /
+2 = REFUSED、走った本数が既知の本数に足りない）。走らなかった実行を緑と
+区別できるようにするため。
 
 ---
 
@@ -114,7 +131,7 @@ cd lg && /tmp/yukkuri-venv/bin/python -m pytest tests/ -q
 ### 4a. dispatch surface をそのまま見る
 
 ```bash
-cd lg-clj && cat > /tmp/probe.clj <<'EOF'
+cat > /tmp/probe.cljs <<'EOF'
 (require '[lg-yukkuri.server :as server]
          '[lg-yukkuri.graphs.health :as health]
          '[lg-yukkuri.audit :as audit])
@@ -124,13 +141,14 @@ cd lg-clj && cat > /tmp/probe.clj <<'EOF'
   (prn :health  (server/dispatch-xrpc "com.etzhayyim.apps.yukkuri.health" {}))
   (prn :unknown (server/dispatch-xrpc "com.etzhayyim.apps.yukkuri.nope" {})))
 EOF
-bb -f /tmp/probe.clj
+nbb --classpath "lg-clj/src:$(clojure -Spath -M:test)" /tmp/probe.cljs
 ```
 
-実測 2026-08-19（抜粋）:
+実測 2026-09-01、nbb で（抜粋）:
 
 ```clojure
-:health  {:status 200 :body {:rw_ok true :ok true :server_now "…Z" :assistantId "health"}}
+:health  {:status 200 :body {:rw_ok true :ok true :server_now "2026-09-01T05:37:20Z"
+                             :latencyMs 11 :assistantId "health"}}
 :unknown {:status 404 :body {:error "unknown NSID: com.etzhayyim.apps.yukkuri.nope"}}
 ```
 
@@ -140,7 +158,7 @@ bb -f /tmp/probe.clj
 ### 4b. 書き込みのある graph — `compose`
 
 ```bash
-cd lg-clj && cat > /tmp/probe-compose.clj <<'EOF'
+cat > /tmp/probe-compose.cljs <<'EOF'
 (require '[lg-yukkuri.server :as server]
          '[lg-yukkuri.store :as store]
          '[lg-yukkuri.audit :as audit])
@@ -151,12 +169,17 @@ cd lg-clj && cat > /tmp/probe-compose.clj <<'EOF'
   (prn :blank (server/dispatch-xrpc "com.etzhayyim.apps.yukkuri.compose" {"topic" "  "})))
 (prn :rows (count @written))
 EOF
-bb -f /tmp/probe-compose.clj
+nbb --classpath "lg-clj/src:$(clojure -Spath -M:test)" /tmp/probe-compose.cljs
 ```
 
-実測 2026-08-19: 1 本目が `:video_id "video-…"` を返し、2 本目が
+実測 2026-09-01、nbb で: 1 本目が `:video_id "video-75e17fa1f5a9"` を返し、2 本目が
 `{:error "topic is required"}`。**`:rows 1`** ——拒否された方は 1 行も書いていない。
 検証が insert の前段にあることが、これで実際に見える。
+
+rkey の 12 桁は `compat/random-hex 6`。JVM は `SecureRandom`、ClojureScript は
+WebCrypto の `getRandomValues` で、**どちらも CSPRNG**——store は rkey での upsert
+なので、生成器が繰り返すと前のレコードが黙って消える（`generated-rkeys-are-unique-…`
+がそれを撃つ）。
 
 `/xrpc` は camelCase を snake_case に落として graph へ渡す（`dispatch-xrpc`）。
 `/runs` は `{:assistant_id … :input …}` を取り、`x-api-key` を任意で強制する:
@@ -184,8 +207,14 @@ bb -f /tmp/probe-compose.clj
   （`../../../40-engine/kotoba/crates/kotoba-kotodama/py`）を指しており、
   west 配置ではそこに解決先が無い。§3 のテストは `conftest.py` の stub で
   この依存を迂回している。
-- `lg-clj` は `bb`（babashka）で回る。workspace 全体としては script host を
-  nbb に寄せる方針（ADR-2607173000）だが、この repo はまだ移行していない。
+- ~~`lg-clj` は `bb`（babashka）で回る。~~ **2026-09-01 に移行済み**
+  （ADR-2607173000）。`bb.edn` と `run_tests.clj` は撤去し、`lg-clj/deps.edn` +
+  `lg-clj/run-tests.cljs`（nbb）+ ルートの `run-tests.cljs`（両方を回して
+  一致を要求する）に置き換えた。`run_tests.clj` は本番の capability 配線
+  （`with-capabilities`）をテストの入口に置き、しかも `run_tests.clj` という
+  ファイルから `ns lg-yukkuri.host` を宣言していた（`load-file` だけが許す
+  不一致）。配線は `lg-clj/src/lg_yukkuri/host.cljc` に移し、`http-post` を
+  引数に取るので runtime を名指ししなくなった。
 
 ---
 
