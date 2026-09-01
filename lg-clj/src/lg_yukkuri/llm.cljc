@@ -7,7 +7,7 @@
   the Murakumo LiteLLM loopback and ASSERTS the endpoint is on the Murakumo
   fleet allowlist (ibuki guard pattern). The chat call itself is an INJECTABLE
   dynamic var so tests rebind it to a deterministic stub and verify offline."
-  (:require #?(:clj [cheshire.core :as json])
+  (:require [json.compat :as json]
             [clojure.string :as str]))
 
 (defn- clip [s n] (let [s (str s)] (subs s 0 (min n (count s)))))
@@ -66,8 +66,8 @@
            (let [body (json/parse-string (:body resp) true)
                  txt (some-> (get-in body [:choices 0 :message :content]) str)]
              (or txt ""))))
-       (catch Exception e
-         {:error (clip (.getMessage e) 200)})))))
+       (catch #?(:clj Exception :cljs :default) e
+         {:error (clip (ex-message e) 200)})))))
 
 (def ^:dynamic *chat-json*
   "Injectable chat edge. (system user opts) → content string | {:error ...}."
@@ -79,17 +79,29 @@
                     {:capability :yukkuri/chat-json})))
   (*chat-json* system user opts))
 
+(defn- try-parse
+  "Parse or nil. `json.compat/parse-string` throws an ex-info carrying
+  `:type :json/parse-error` on malformed input; the Python fallback this
+  mirrors swallows the equivalent and moves on to the brace scan."
+  [s]
+  (try (json/parse-string s true)
+       (catch #?(:clj Exception :cljs :default) _ nil)))
+
 (defn parse-json-object
   "Lenient JSON-object parse mirroring the Python fallback: try whole string,
-  else extract the first {...} block. Returns a clj map (keyword keys) or nil."
+  else extract the first {...} block. Returns a clj map (keyword keys) or nil.
+
+  Until 2026-09-01 both parses sat behind `#?(:clj ... :default nil)` and this
+  function returned nil for EVERY input under ClojureScript -- indistinguishable
+  from `the model emitted no JSON object`, which is the one thing the caller
+  branches on. The scriptwriter and critic graphs would have failed closed on
+  every well-formed response. No test caught it because no test ever ran here."
   [raw]
-  (let [try1  #?(:clj (try (json/parse-string (str raw) true) (catch Exception _ nil))
-                  :default nil)]
+  (let [try1 (try-parse (str raw))]
     (if (map? try1)
       try1
       (let [s (str raw)
             i (str/index-of s "{")
             j (str/last-index-of s "}")]
         (when (and i j (< i j))
-          #?(:clj (try (json/parse-string (subs s i (inc j)) true) (catch Exception _ nil))
-             :default nil))))))
+          (try-parse (subs s i (inc j))))))))

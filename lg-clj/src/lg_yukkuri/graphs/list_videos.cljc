@@ -9,13 +9,14 @@
   The DB read is the INJECTABLE `store/*select-where*` seam (kotoba-Datom-log
   target; RisingWave forbidden by the substrate boundary). limit clamps to
   1..200 (default 50), offset>=0; rows sort by created_at desc then page."
-  (:require [langgraph.graph :as g]
+  (:require [lg-yukkuri.compat :as compat]
+            [langgraph.graph :as g]
             [lg-yukkuri.audit :as audit]
             [lg-yukkuri.store :as store]))
 
 (defn- as-int [v d]
   (cond (integer? v) v
-        (string? v) (try (Integer/parseInt v) (catch Exception _ d))
+        (string? v) (compat/->int v d)
         :else d))
 
 (defn- clamp [v lo hi] (max lo (min hi v)))
@@ -44,12 +45,12 @@
             total  (count sorted)
             paged  (->> sorted (drop offset) (take limit))]
         {:videos (mapv row->video paged) :total total})
-      (catch Exception e {:error (str "query: " (.getMessage e))}))))
+      (catch #?(:clj Exception :cljs :default) e {:error (str "query: " (ex-message e))}))))
 
 (defn node-audit [state]
   (audit/emit-audit-bg {:actor (:app-did (audit/config-from-state state))
                         :activity "yukkuri.listVideos"
-                        :object-id (str "listVideos:" (quot (System/currentTimeMillis) 1000))
+                        :object-id (str "listVideos:" (quot (compat/now-ms) 1000))
                         :object-type "yukkuri.video"
                         :attributes {:returned (int (or (:total state) 0))}})
   {})

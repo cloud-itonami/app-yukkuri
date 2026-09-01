@@ -11,7 +11,8 @@
   to the ongakuka XRPC; default uses babashka.http-client). The CLAP cosine
   copyright guard (similarity > 0.92 → reject) is enforced server-side by
   ongakuka. Topic read + asset write go through the store seam."
-  (:require #?(:clj [cheshire.core :as json])
+  (:require [lg-yukkuri.compat :as compat]
+            [json.compat :as json]
             [clojure.string :as str]
             [langgraph.graph :as g]
             [lg-yukkuri.audit :as audit]
@@ -19,8 +20,7 @@
 
 (defn- clip [s n] (let [s (str s)] (subs s 0 (min n (count s)))))
 (defn- token-hex [n]
-  (let [bs (byte-array n)] (.nextBytes (java.security.SecureRandom.) bs)
-    (apply str (map #(format "%02x" %) bs))))
+  (compat/random-hex n))
 
 (defn compose-bgm-with
   "Default `*compose-bgm*`: POST to the ongakuka compose XRPC, return
@@ -41,7 +41,7 @@
         (let [data (json/parse-string (:body r) true)
               bk   (or (:blobKey data) (:blob_key data) "")]
           (if (empty? bk) {:error "ongakuka returned no blobKey"} {:bgm_blob_key bk}))))
-    (catch Exception e {:error (str "ongakuka: " (clip (.getMessage e) 180))}))))
+    (catch #?(:clj Exception :cljs :default) e {:error (str "ongakuka: " (clip (ex-message e) 180))}))))
 
 (def ^:dynamic *compose-bgm* nil)
 
@@ -54,7 +54,7 @@
         (try
           (let [rows (store/select-where "vertex_yukkuri_video" "video_id" video-id 1)]
             (if (seq rows) {:topic (or (:topic (first rows)) "")} {}))
-          (catch Exception _ {}))))))
+          (catch #?(:clj Exception :cljs :default) _ {}))))))
 
 (defn node-compose-bgm [state]
   (if (:error state)
@@ -73,19 +73,19 @@
     (let [composer-did (:composer-did (audit/config-from-state state))
           video-id (or (:video_id state) "")
           asset-id (str "asset-bgm-" video-id "-" (token-hex 3))
-          created  (str (java.time.OffsetDateTime/now java.time.ZoneOffset/UTC))]
+          created  (compat/now-timestamp)]
       (try
         (store/insert-row "vertex_yukkuri_asset"
                           {:vertex_id asset-id :video_id video-id :kind "bgm"
                            :actor_did composer-did :blob_key (:bgm_blob_key state)
                            :meta_json "{}" :created_at created})
         {:bgm_asset_id asset-id}
-        (catch Exception e {:error (str "insert: " (clip (.getMessage e) 280))})))))
+        (catch #?(:clj Exception :cljs :default) e {:error (str "insert: " (clip (ex-message e) 280))})))))
 
 (defn node-audit [state]
   (audit/emit-audit-bg {:actor (:composer-did (audit/config-from-state state))
                         :activity "yukkuri.generateBgm"
-                        :object-id (str "bgm:" (or (:video_id state) "") ":" (quot (System/currentTimeMillis) 1000))
+                        :object-id (str "bgm:" (or (:video_id state) "") ":" (quot (compat/now-ms) 1000))
                         :object-type "yukkuri.asset"
                         :attributes {:videoId (:video_id state) :ok (not (boolean (:error state)))}})
   {})

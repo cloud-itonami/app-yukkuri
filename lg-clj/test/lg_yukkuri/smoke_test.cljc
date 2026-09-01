@@ -5,6 +5,7 @@
   pipeline topology + transforms verify under bb with stubs)."
   (:require [clojure.test :refer [deftest is testing]]
             [langgraph.graph :as g]
+            [lg-yukkuri.compat :as compat]
             [lg-yukkuri.server :as server]
             [lg-yukkuri.store :as store]
             [lg-yukkuri.audit :as audit]
@@ -109,6 +110,15 @@
   (is (= "video_id" (server/camel->snake "videoId")))
   (is (= "generate_script" (server/camel->snake "generateScript")))
   (is (= {:video_id "v1" :owner_did "d"} (server/coerce-xrpc-input {"videoId" "v1" "ownerDid" "d"}))))
+
+(deftest camel-to-snake-does-not-prefix-the-first-character
+  ;; `_camel_to_snake` skips index 0, so a key that already starts upper case
+  ;; lower-cases without gaining a leading underscore. Every case above starts
+  ;; lower case, so all of them pass with the index guard deleted -- the key
+  ;; would silently become :_video_id and every graph would read nil.
+  (is (= "video_id" (server/camel->snake "VideoId")))
+  (is (= "status" (server/camel->snake "Status")))
+  (is (= {:video_id "v1"} (server/coerce-xrpc-input {"VideoId" "v1"}))))
 
 (deftest xrpc-dispatch-snake-coercion
   ;; getVideo with no store rows → error 'video not found' proves video_id flowed through
@@ -309,6 +319,77 @@
         (is (= "https://b2/x.mp4" (:render_url out)))
         (is (some #{"rendered"} @statuses))))))
 
+(deftest render-video-timeline-round-trips-asset-meta
+  ;; `node-build-timeline` reads each asset's `meta_json` column and folds it
+  ;; into the timeline it hands the renderer. Both halves of that -- the parse
+  ;; on the way in and the generate on the way out -- had a `:default` branch
+  ;; that returned nil / EDN under ClojureScript until 2026-09-01. The happy
+  ;; path above asserts on the RENDER RESULT, which the stub supplies, so it
+  ;; stays green with `json-parse` replaced by `(constantly nil)`: the meta is
+  ;; simply absent from a string nobody reads. This reads the string.
+  (let [timelines (atom [])]
+    (binding [store/*select-where*
+              (fn [table _ _ _]
+                (case table
+                  "vertex_yukkuri_scene" [{:scene_index 0 :location "L" :action "A"}]
+                  "vertex_yukkuri_line"  [{:scene_index 0 :line_index 0 :speaker "left" :text "x"}]
+                  "vertex_yukkuri_asset" [{:kind "image" :blob_key "k"
+                                           :meta_json "{\"sceneIndex\":7,\"width\":1280}"}]
+                  "vertex_yukkuri_video" [{:video_id "v1" :status "assembled"}]
+                  []))
+              store/*insert-row* (fn [_t row] row)
+              rv/*render* (fn [_vid timeline] (swap! timelines conj timeline)
+                            {:render_blob_key "rk" :render_url "https://b2/x.mp4"})]
+      (g/invoke rv/GRAPH {:video_id "v1"})
+      ;; `node-build-timeline` GENERATES the JSON and `node-render` PARSES it
+      ;; again before handing it over, so what the capability receives is a map
+      ;; that has been through both halves of the codec. If either half is
+      ;; wrong -- EDN out, or nil back -- this argument is nil.
+      (let [tl (first @timelines)]
+        (is (map? tl) "the renderer must receive a parsed timeline, not nil")
+        (is (= "v1" (:videoId tl)))
+        (is (= 7 (get-in tl [:assets 0 :meta :sceneIndex]))
+            "asset meta_json must survive the round trip into the timeline")
+        (is (= 1280 (get-in tl [:assets 0 :meta :width])))
+        (is (= 1 (count (:scenes tl))))))))
+
+(deftest list-videos-falls-back-to-the-declared-default-for-a-bad-limit
+  ;; `as-int` exists so a non-numeric `limit` from the wire lands on the
+  ;; documented default of 50 rather than throwing. Nothing asserted WHICH
+  ;; value it lands on, so changing the fallback to any other number left the
+  ;; suite green. 60 rows in, 50 out is the assertion that pins it.
+  (binding [store/*select-where*
+            (fn [_ _ _ _] (mapv (fn [i] {:video_id (str "v" i) :status "queued"
+                                         :created_at (str "2026-09-01T00:00:" (when (< i 10) "0") i)})
+                                (range 60)))]
+    (let [out (g/invoke lv/GRAPH {:owner_did "d" :limit "not-a-number"})]
+      (is (= 60 (:total out)))
+      (is (= 50 (count (:videos out))) "a bad limit must fall back to 50, not to some other number"))
+    (let [out (g/invoke lv/GRAPH {:owner_did "d" :limit "7"})]
+      (is (= 7 (count (:videos out))) "a numeric-string limit must still be honoured"))))
+
+(deftest generated-rkeys-are-unique-so-no-record-overwrites-another
+  ;; `compose`, `generate_visual` and `generate_bgm` each mint an rkey from
+  ;; `compat/random-hex`, and the store seam is an UPSERT keyed on it. A
+  ;; generator that repeats therefore does not fail: every insert returns
+  ;; normally, the graph reports success, and the previous record is gone.
+  ;; Replacing the ClojureScript branch of `random-hex` with a constant left
+  ;; the entire suite green -- measured 2026-09-01.
+  (testing "the generator itself"
+    (let [xs (repeatedly 16 #(compat/random-hex 6))]
+      (is (every? #(re-matches #"[0-9a-f]{12}" %) xs)
+          "6 bytes must render as exactly 12 lowercase hex characters")
+      (is (= 16 (count (distinct xs))) "random-hex must not repeat")))
+  (testing "and the video ids that come out of the compose graph"
+    (let [rows (atom [])]
+      (binding [store/*insert-row* (fn [_t row] (swap! rows conj row) row)]
+        (dotimes [_ 8] (g/invoke compose/GRAPH {:topic "同じ話題"})))
+      (let [ids (mapv :video_id @rows)]
+        (is (= 8 (count ids)))
+        (is (every? #(re-matches #"video-[0-9a-f]{12}" %) ids))
+        (is (= 8 (count (distinct ids)))
+            "eight composes of the same topic must not collide onto one rkey")))))
+
 ;; ── review_video graph: fail-closed + verdict + publish ─────────────────────
 
 (deftest review-video-pass-publishes
@@ -352,13 +433,40 @@
 
 ;; ── Murakumo fleet guard (ADR-2605215000) ───────────────────────────────────
 
+(defn- refusal-data
+  "Call `f`, return the ex-data of the refusal it throws, or nil if it returned.
+
+  `(is (thrown? ExceptionInfo ...))` would pass for a refusal thrown for ANY
+  reason -- a typo in the function name under test throws too. Reading the
+  ex-data lets each assertion below name the reason it is actually testing for
+  (`:murakumo-only-violation`), so the test fails if the guard is replaced by
+  a different one that happens to also throw."
+  [f]
+  (try (f) nil
+       (catch #?(:clj Exception :cljs :default) e (or (ex-data e) {:no-ex-data true}))))
+
 (deftest murakumo-guard
-  (testing "off-fleet endpoint refused"
-    (is (thrown? clojure.lang.ExceptionInfo (llm/assert-murakumo "https://api.openai.com/v1"))))
+  (testing "off-fleet endpoint refused, for being off-fleet"
+    (let [d (refusal-data #(llm/assert-murakumo "https://api.openai.com/v1"))]
+      (is (true? (:murakumo-only-violation d)))
+      (is (= "https://api.openai.com/v1" (:endpoint d)))))
   (testing "loopback gateway allowed"
     (is (nil? (llm/assert-murakumo "http://127.0.0.1:4000/v1"))))
+  (testing "https loopback refused -- the allowlist is on http, not just the host"
+    (is (true? (:murakumo-only-violation (refusal-data #(llm/assert-murakumo "https://127.0.0.1:4000/v1"))))))
+  (testing "off-fleet host over http refused -- the HOST allowlist, not the scheme"
+    ;; The two conditions in `assert-murakumo` are `and`-ed, so an https URL is
+    ;; refused for its scheme no matter what the host allowlist says. Testing
+    ;; only https://api.openai.com/v1 therefore passes with api.openai.com
+    ;; ADDED to murakumo-allowed-hosts -- measured 2026-09-01, that mutation
+    ;; left the whole suite green. This case is the one that pins the host set.
+    (is (true? (:murakumo-only-violation (refusal-data #(llm/assert-murakumo "http://api.openai.com/v1")))))
+    (is (true? (:murakumo-only-violation (refusal-data #(llm/assert-murakumo "http://10.0.0.5:4000/v1"))))))
+  (testing "every host on the allowlist is reachable over http"
+    (doseq [h llm/murakumo-allowed-hosts]
+      (is (nil? (llm/assert-murakumo (str "http://" h "/v1"))) h)))
   (testing "malformed endpoint refused"
-    (is (thrown? clojure.lang.ExceptionInfo (llm/assert-murakumo "not-a-url")))))
+    (is (true? (:murakumo-only-violation (refusal-data #(llm/assert-murakumo "not-a-url")))))))
 
 (deftest outward-capabilities-fail-closed
   (binding [llm/*chat-json* nil
@@ -367,17 +475,17 @@
             sv/*tts-one* nil
             rev/*social-publish* nil
             rv/*render* nil]
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"explicit chat capability"
+    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs :default) #"explicit chat capability"
                           (llm/chat-json "s" "u" {})))
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"explicit compose capability"
+    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs :default) #"explicit compose capability"
                           (gbgm/node-compose-bgm {:topic "t"})))
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"explicit generation capability"
+    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs :default) #"explicit generation capability"
                           (gvis/node-generate {:scenes [{}]})))
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"explicit TTS capability"
+    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs :default) #"explicit TTS capability"
                           (sv/node-synthesize {:lines [{}]})))
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"explicit social capability"
+    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs :default) #"explicit social capability"
                           (rev/node-social-publish {:review_passed true})))
-    (is (thrown-with-msg? clojure.lang.ExceptionInfo #"explicit render capability"
+    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs :default) #"explicit render capability"
                           (rv/node-render {:video_id "v" :timeline_json "{}"})))))
 
 ;; ── audit shim: injectable + disabled ───────────────────────────────────────

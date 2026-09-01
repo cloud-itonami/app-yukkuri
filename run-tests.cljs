@@ -1,0 +1,78 @@
+#!/usr/bin/env nbb
+;; Run the lg-clj suite on BOTH runtimes and require them to agree.
+;;
+;;   nbb run-tests.cljs
+;;
+;; WHY BOTH, AND WHY IN ONE COMMAND.
+;;
+;; Every source file under `lg-clj/src` is `.cljc`, and until 2026-09-01
+;; exactly one runtime had ever loaded them: `bb test`, on a JVM. The
+;; ClojureScript branch of every reader conditional was unexecuted, and
+;; `lg-yukkuri.audit` did not even compile there. Worse than the ones that
+;; failed to load were the two that loaded and lied:
+;; `llm/parse-json-object` and `render-video/json-parse` were
+;; `#?(:clj ... :default nil)`, so under ClojureScript they returned nil for
+;; every input -- the same value they return for "there was no JSON object
+;; here", which is the one thing their callers branch on.
+;;
+;; A single-runtime command cannot see that class of defect, and neither can
+;; a mutation harness driving a single-runtime command: a mutation that only
+;; edits a `:cljs` branch leaves a JVM run byte-identical, so the harness
+;; reports "this invariant is unguarded" when the truth is "this run never
+;; looked". Three of the eleven mutations registered for this repo in
+;; scripts/maturity-loop/mutations.edn are exactly that shape.
+;;
+;; So this script is the repo's test command, and it fails unless BOTH
+;; runtimes ran and BOTH agree on how many tests and assertions there were.
+(ns run-tests
+  (:require ["node:child_process" :as cp]
+            [clojure.string :as str]))
+
+(defn- sh [cmd args]
+  (let [r (cp/spawnSync cmd (clj->js args)
+                        #js {:encoding "utf8" :maxBuffer (* 64 1024 1024)})]
+    {:out (str (.-stdout r) (.-stderr r)) :code (or (.-status r) 1)}))
+
+(defn- counts
+  "`Ran N tests containing M assertions.` -> [N M], or nil when the line is
+  absent. Absent is not zero: it means the runtime never got as far as
+  reporting, which must not be readable as a small green run."
+  [out]
+  (when-let [[_ n m] (re-find #"Ran (\d+) tests containing (\d+) assertions" out)]
+    [(parse-long n) (parse-long m)]))
+
+(println "── JVM (clojure -M:test) ─────────────────────────────────────────")
+(def jvm (sh "clojure" ["-M:test"]))
+(println (:out jvm))
+
+(println "── classpath for nbb ─────────────────────────────────────────────")
+(def cp-res (sh "clojure" ["-Spath" "-M:test"]))
+(when-not (zero? (:code cp-res))
+  (println "REFUSING to report a pass: could not resolve the classpath\n" (:out cp-res))
+  (js/process.exit 2))
+
+(println "── ClojureScript (nbb) ───────────────────────────────────────────")
+(def cljs-res
+  (sh "nbb" ["--classpath" (str "lg-clj/src:lg-clj/test:" (str/trim (:out cp-res)))
+             "lg-clj/run-tests.cljs"]))
+(println (:out cljs-res))
+
+(let [jc (counts (:out jvm))
+      cc (counts (:out cljs-res))]
+  (cond
+    (or (nil? jc) (nil? cc))
+    (do (println "REFUSING to report a pass: a runtime produced no test count"
+                 {:jvm jc :cljs cc})
+        (js/process.exit 2))
+
+    (not= jc cc)
+    (do (println "RUNTIME DISAGREEMENT: JVM ran" jc "and ClojureScript ran" cc
+                 "-- the same suite must run the same tests on both")
+        (js/process.exit 1))
+
+    (pos? (+ (:code jvm) (:code cljs-res)))
+    (js/process.exit 1)
+
+    :else
+    (println (str "lg-yukkuri: both runtimes agree -- " (first jc) " tests, "
+                  (second jc) " assertions, 0 failures, 0 errors"))))

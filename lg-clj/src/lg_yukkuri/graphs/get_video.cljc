@@ -10,11 +10,12 @@
   All four fetches read through the INJECTABLE `store/*select-where*` seam.
   fetch_scenes/lines/assets short-circuit (return {}) when fetch_video errored
   or found nothing, exactly as the Python guards do."
-  (:require [langgraph.graph :as g]
+  (:require [lg-yukkuri.compat :as compat]
+            [langgraph.graph :as g]
             [lg-yukkuri.audit :as audit]
             [lg-yukkuri.store :as store]))
 
-(defn- as-int [v d] (cond (integer? v) v (string? v) (try (Integer/parseInt v) (catch Exception _ d)) :else d))
+(defn- as-int [v d] (compat/->int v d))
 
 (defn node-fetch-video [state]
   (let [video-id (or (:video_id state) "")]
@@ -33,7 +34,7 @@
                        :renderUrl     (:render_url r)
                        :renderBlobKey (:render_blob_key r)
                        :createdAt     (str (or (:created_at r) ""))}})))
-        (catch Exception e {:error (str "fetch: " (.getMessage e))})))))
+        (catch #?(:clj Exception :cljs :default) e {:error (str "fetch: " (ex-message e))})))))
 
 (defn- skip? [state] (or (:error state) (not (:video state))))
 
@@ -45,7 +46,7 @@
                       (sort-by #(as-int (:scene_index %) 0)))]
         {:scenes (mapv (fn [r] {:sceneIndex (as-int (:scene_index r) 0)
                                 :location (:location r) :action (:action r)}) rows)})
-      (catch Exception _ {:scenes []}))))
+      (catch #?(:clj Exception :cljs :default) _ {:scenes []}))))
 
 (defn node-fetch-lines [state]
   (if (skip? state)
@@ -57,7 +58,7 @@
                                :lineIndex (as-int (:line_index r) 0)
                                :speaker (:speaker r) :text (:text r)
                                :emotion (:emotion r) :voiceBlobKey (:voice_blob_key r)}) rows)})
-      (catch Exception _ {:lines []}))))
+      (catch #?(:clj Exception :cljs :default) _ {:lines []}))))
 
 (defn node-fetch-assets [state]
   (if (skip? state)
@@ -67,12 +68,12 @@
                       (sort-by #(str (or (:created_at %) ""))))]
         {:assets (mapv (fn [r] {:kind (:kind r) :actorDid (:actor_did r)
                                 :blobKey (:blob_key r) :createdAt (str (or (:created_at r) ""))}) rows)})
-      (catch Exception _ {:assets []}))))
+      (catch #?(:clj Exception :cljs :default) _ {:assets []}))))
 
 (defn node-audit [state]
   (audit/emit-audit-bg {:actor (:app-did (audit/config-from-state state))
                         :activity "yukkuri.getVideo"
-                        :object-id (str "video:" (or (:video_id state) "") ":" (quot (System/currentTimeMillis) 1000))
+                        :object-id (str "video:" (or (:video_id state) "") ":" (quot (compat/now-ms) 1000))
                         :object-type "yukkuri.video"
                         :attributes {:videoId (:video_id state) :found (some? (:video state))}})
   {})

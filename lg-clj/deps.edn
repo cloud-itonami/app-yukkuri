@@ -1,0 +1,39 @@
+{;; lg-yukkuri — clj/cljs twin of the Python LangGraph server (ADR-2606280030).
+ ;;
+ ;; Scoped to this app only; it does NOT touch the superproject root. The Python
+ ;; FastAPI runtime under `../lg/` remains the DEPLOYED runtime and COEXISTS with
+ ;; this twin until a human cuts over.
+ ;;
+ ;; This file replaces the `bb.edn` that used to hold the same two dependencies.
+ ;; ADR-2607173000 retired babashka as this workspace's script host, and the
+ ;; practical cost of staying on it was concrete rather than stylistic: `bb test`
+ ;; was the ONLY thing that ever ran these `.cljc` sources, babashka is a JVM,
+ ;; and so the ClojureScript half of every reader conditional here was dead
+ ;; code no runtime had ever loaded. It did not load: see `lg-yukkuri.compat`.
+ ;;
+ ;; Two runtimes, one suite (`run-tests.cljs` explains the split):
+ ;;   nbb --classpath "src:test:$(clojure -Spath -M:test)" run-tests.cljs
+ ;;   clojure -M:test
+ :paths ["src"]
+
+ ;; Pinned at each upstream default branch tip, verified reachable 2026-09-01.
+ ;; `json` is a direct dependency (lg-yukkuri.audit / .llm and four graphs call
+ ;; `json.compat`) even though langchain would supply it transitively -- what a
+ ;; namespace requires, its own deps.edn should name.
+ :deps {io.github.kotoba-lang/langgraph
+        {:git/sha "5fdc6e7d71d95bc78db4fa1a20c325c79940f984"}
+        io.github.kotoba-lang/langchain
+        {:git/sha "94d3a76b77a9667493418346fbebeae61640def3"}
+        io.github.kotoba-lang/json
+        {:git/sha "d5137c7bbd029e4c09964e8241899d2c286302bf"}}
+
+ :aliases
+ {:test {:extra-paths ["test"]
+         :extra-deps {io.github.cognitect-labs/test-runner
+                      {:git/tag "v0.5.1" :git/sha "dfb30dd"}}
+         :main-opts ["-m" "cognitect.test-runner"]
+         :exec-fn cognitect.test-runner.api/test}
+  ;; local checkouts for workspace development (orgs/kotoba-lang/*)
+  :dev {:override-deps {io.github.kotoba-lang/langgraph {:local/root "../../../kotoba-lang/langgraph"}
+                        io.github.kotoba-lang/langchain {:local/root "../../../kotoba-lang/langchain"}
+                        io.github.kotoba-lang/json      {:local/root "../../../kotoba-lang/json"}}}}}

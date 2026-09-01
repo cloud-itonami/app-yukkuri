@@ -14,7 +14,8 @@
   status 'published' + a T1 social post via the INJECTABLE `*social-publish*`
   boundary fn; on REJECT → status 'rejected'. Content read + status write go
   through the store seam."
-  (:require #?(:clj [cheshire.core :as json])
+  (:require [lg-yukkuri.compat :as compat]
+            [json.compat :as json]
             [clojure.string :as str]
             [langgraph.graph :as g]
             [lg-yukkuri.audit :as audit]
@@ -31,7 +32,7 @@
        "- Reproduces copyrighted lyrics/text verbatim (>30 chars)\n\n"
        "Output JSON only: {\"verdict\": \"PASS\"|\"REJECT\", \"reason\": \"<brief reason or null>\"}\n"))
 
-(defn- as-int [v d] (cond (integer? v) v (string? v) (try (Integer/parseInt v) (catch Exception _ d)) :else d))
+(defn- as-int [v d] (compat/->int v d))
 (defn- clip [s n] (let [s (str s)] (subs s 0 (min n (count s)))))
 
 (defn social-publish-with
@@ -49,7 +50,7 @@
                               :text (str "🎬 新作ゆっくり動画: " (clip topic 80) "\nyukkuri.etzhayyim.com")
                               :collection "app.bsky.feed.post"})})
     nil)
-    (catch Exception _ nil))))
+    (catch #?(:clj Exception :cljs :default) _ nil))))
 
 (def ^:dynamic *social-publish* nil)
 
@@ -65,7 +66,7 @@
                          (take 40))
               excerpt (str/join "\n" (map #(str (str/upper-case (or (:speaker %) "")) ": " (:text %)) lines))]
           {:topic topic :script_excerpt excerpt})
-        (catch Exception e {:error (str "fetch: " (clip (.getMessage e) 180))})))))
+        (catch #?(:clj Exception :cljs :default) e {:error (str "fetch: " (clip (ex-message e) 180))})))))
 
 (defn node-llm-review [state]
   (if (:error state)
@@ -90,7 +91,7 @@
           (when (seq rows)
             (store/insert-row "vertex_yukkuri_video" (assoc (first rows) :status new-status)))
           {})
-        (catch Exception e {:error (str "update: " (clip (.getMessage e) 280))})))))
+        (catch #?(:clj Exception :cljs :default) e {:error (str "update: " (clip (ex-message e) 280))})))))
 
 (defn node-social-publish [state]
   (if (or (:error state) (not (:review_passed state)))
@@ -105,7 +106,7 @@
 (defn node-audit [state]
   (audit/emit-audit-bg {:actor (:critic-did (audit/config-from-state state))
                         :activity "yukkuri.reviewVideo"
-                        :object-id (str "review:" (or (:video_id state) "") ":" (quot (System/currentTimeMillis) 1000))
+                        :object-id (str "review:" (or (:video_id state) "") ":" (quot (compat/now-ms) 1000))
                         :object-type "yukkuri.review"
                         :attributes {:videoId (:video_id state) :passed (:review_passed state)
                                      :reason (:review_reason state)}})

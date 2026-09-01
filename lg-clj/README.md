@@ -73,6 +73,40 @@ not need to reproduce to be faithful to the registered graph set.
 ## Run
 
 ```bash
-bb test            # clojure.test suite (run_tests.clj)  → 40 tests / 115 assertions
-bb run_tests.clj   # same
+nbb run-tests.cljs          # from the REPO ROOT: both runtimes, and they must agree
 ```
+
+→ `lg-yukkuri: both runtimes agree -- 44 tests, 141 assertions, 0 failures, 0 errors`
+
+One runtime at a time:
+
+```bash
+clojure -M:test                                                     # JVM
+nbb --classpath "src:test:$(clojure -Spath -M:test)" run-tests.cljs # ClojureScript (from lg-clj/)
+```
+
+Both must run, because every file here is `.cljc` and until 2026-09-01 only
+one runtime had ever loaded them. `bb test` was the suite, babashka is a JVM,
+and so the ClojureScript branch of every reader conditional was dead code.
+It did not work: `lg-yukkuri.audit` used `json/generate-string` outside the
+`#?(:clj ...)` that required it and would not compile; `compose`,
+`generate-visual` and `synthesize-voice` reached for `byte-array`,
+`java.security.SecureRandom`, `java.util.Base64` and `pmap`.
+
+Two loaded and gave wrong answers instead, which is worse:
+`llm/parse-json-object` and `render-video/json-parse` were
+`#?(:clj ... :default nil)`, returning nil for **every** input under
+ClojureScript -- the same value they return for "there was no JSON object
+here". The scriptwriter and critic graphs would have failed closed on every
+well-formed model response and reported it as the model's fault.
+`render-video/json-gen` fell back to `(str m)`, writing EDN into a column
+named `meta_json`.
+
+Host differences now live in ONE namespace, `lg-yukkuri.compat`
+(`now-ms` `now-nanos` `now-iso` `now-timestamp` `ex-type-name` `->int`
+`random-hex` `base64-decode` `fan-out`), where both branches sit on adjacent
+lines. Spreading `#?(:clj ...)` back across the graph files is how the
+`:default nil` pair survived: each one was locally plausible.
+
+`scripts/maturity-loop/mutations.edn` carries 11 mutations for this repo;
+five of them left the suite green until the tests added on 2026-09-01.

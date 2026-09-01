@@ -10,14 +10,15 @@
   The TTS+uploadBlob call is the INJECTABLE `*tts-one*` boundary fn (native
   murakumo audio endpoint + PDS uploadBlob); the default uses babashka.http-client.
   The Python fans the per-line TTS out with asyncio.gather; clj runs them via
-  `pmap` (a faithful parallel analogue). Line reads/writes go through the store
+  `compat/fan-out` (`pmap` on the JVM). Line reads/writes go through the store
   seam. DEVIATION: no RetryPolicy in langgraph-clj."
-  (:require #?(:clj [cheshire.core :as json])
+  (:require [lg-yukkuri.compat :as compat]
+            [json.compat :as json]
             [langgraph.graph :as g]
             [lg-yukkuri.audit :as audit]
             [lg-yukkuri.store :as store]))
 
-(defn- as-int [v d] (cond (integer? v) v (string? v) (try (Integer/parseInt v) (catch Exception _ d)) :else d))
+(defn- as-int [v d] (compat/->int v d))
 (defn- clip [s n] (let [s (str s)] (subs s 0 (min n (count s)))))
 
 (defn tts-one-with
@@ -43,7 +44,7 @@
             {:line_id (:line_id line) :error (str "uploadBlob " (:status ub))}
             {:line_id (:line_id line) :speaker (:speaker line)
              :blob_key (get-in (json/parse-string (:body ub) true) [:blob :ref :$link] "")}))))
-    (catch Exception e {:line_id (:line_id line) :error (clip (.getMessage e) 200)})))
+    (catch #?(:clj Exception :cljs :default) e {:line_id (:line_id line) :error (clip (ex-message e) 200)})))
   )
 
 (def ^:dynamic *tts-one* nil)
@@ -60,7 +61,7 @@
     (if (= "" video-id)
       {:error "video_id required"}
       (try {:lines (fetch-lines video-id)}
-           (catch Exception e {:error (str "fetch_lines: " (clip (.getMessage e) 180))})))))
+           (catch #?(:clj Exception :cljs :default) e {:error (str "fetch_lines: " (clip (ex-message e) 180))})))))
 
 (defn node-synthesize [state]
   (if (:error state)
@@ -72,7 +73,7 @@
           (when-not (fn? *tts-one*)
             (throw (ex-info "synthesizeVoice requires an explicit TTS capability"
                             {:capability :yukkuri/tts-one})))
-          (let [results (doall (pmap *tts-one* lines))
+          (let [results (compat/fan-out *tts-one* lines)
                 ok      (vec (remove :error results))]
             {:voice_assets ok :synthesized_count (count ok)}))))))
 
@@ -85,12 +86,12 @@
           (when (seq rows)
             (store/insert-row "vertex_yukkuri_line" (assoc (first rows) :voice_blob_key (:blob_key asset))))))
       {}
-      (catch Exception e {:error (str "update: " (clip (.getMessage e) 280))}))))
+      (catch #?(:clj Exception :cljs :default) e {:error (str "update: " (clip (ex-message e) 280))}))))
 
 (defn node-audit [state]
   (audit/emit-audit-bg {:actor (:app-did (audit/config-from-state state))
                         :activity "yukkuri.synthesizeVoice"
-                        :object-id (str "voice:" (or (:video_id state) "") ":" (quot (System/currentTimeMillis) 1000))
+                        :object-id (str "voice:" (or (:video_id state) "") ":" (quot (compat/now-ms) 1000))
                         :object-type "yukkuri.voice"
                         :attributes {:videoId (:video_id state) :synthesizedCount (or (:synthesized_count state) 0)
                                      :ok (not (boolean (:error state)))}})

@@ -15,15 +15,21 @@
   streaming-INSERT visibility. The kotoba Datom log is read-committed (no
   streaming lag), so this port reads once with no retry loop; the assembly logic
   + the \"no scenes → error\" guard are identical. No RetryPolicy in langgraph-clj."
-  (:require #?(:clj [cheshire.core :as json])
+  (:require [lg-yukkuri.compat :as compat]
+            [json.compat :as json]
             [langgraph.graph :as g]
             [lg-yukkuri.audit :as audit]
             [lg-yukkuri.store :as store]))
 
-(defn- as-int [v d] (cond (integer? v) v (string? v) (try (Integer/parseInt v) (catch Exception _ d)) :else d))
+(defn- as-int [v d] (compat/->int v d))
 (defn- clip [s n] (let [s (str s)] (subs s 0 (min n (count s)))))
-(defn- json-gen [m] #?(:clj (json/generate-string m) :default (str m)))
-(defn- json-parse [s] #?(:clj (json/parse-string s true) :default nil))
+;; Until 2026-09-01 these two were `#?(:clj ... :default (str m))` and
+;; `#?(:clj ... :default nil)`. The generator's fallback emitted EDN into a
+;; field named `meta_json` -- accepted by every caller, valid JSON to none --
+;; and the parser's fallback returned nil, which is also what a genuinely
+;; absent `meta_json` returns. Both now go through the portable codec.
+(defn- json-gen [m] (json/generate-string m))
+(defn- json-parse [s] (json/parse-string s true))
 
 (defn render-with
   "Default `*render*`: POST the timeline to the dougaka render XRPC, return
@@ -45,7 +51,7 @@
               url  (or (:blob_url data) (:blobUrl data) (:url data) "")]
           (if (empty? bk) {:error (str "dougaka render returned no blobKey")}
               {:render_blob_key bk :render_url url}))))
-    (catch Exception e {:error (str "dougaka render: " (clip (.getMessage e) 280))}))))
+    (catch #?(:clj Exception :cljs :default) e {:error (str "dougaka render: " (clip (ex-message e) 280))}))))
 
 (def ^:dynamic *render* nil)
 
@@ -66,7 +72,7 @@
                                            :text (:text r) :emotion (:emotion r)
                                            :voiceBlobKey (:voice_blob_key r)})))
                 assets (mapv (fn [r] {:kind (:kind r) :blobKey (:blob_key r)
-                                      :meta (try (json-parse (or (:meta_json r) "{}")) (catch Exception _ {}))})
+                                      :meta (try (json-parse (or (:meta_json r) "{}")) (catch #?(:clj Exception :cljs :default) _ {}))})
                              (store/select-where "vertex_yukkuri_asset" "video_id" video-id 100))]
             {:timeline_json (json-gen {:videoId video-id :scenes scenes :lines lines :assets assets
                                        :format "mp4" :resolution "1280x720" :fps 30})}))))))
@@ -91,12 +97,12 @@
                                    :render_blob_key (:render_blob_key state)
                                    :render_url (:render_url state))))
         {})
-      (catch Exception e {:error (str "update: " (clip (.getMessage e) 280))}))))
+      (catch #?(:clj Exception :cljs :default) e {:error (str "update: " (clip (ex-message e) 280))}))))
 
 (defn node-audit [state]
   (audit/emit-audit-bg {:actor (:renderer-did (audit/config-from-state state))
                         :activity "yukkuri.renderVideo"
-                        :object-id (str "render:" (or (:video_id state) "") ":" (quot (System/currentTimeMillis) 1000))
+                        :object-id (str "render:" (or (:video_id state) "") ":" (quot (compat/now-ms) 1000))
                         :object-type "yukkuri.render"
                         :attributes {:videoId (:video_id state) :blobKey (:render_blob_key state)
                                      :ok (not (boolean (:error state)))}})
