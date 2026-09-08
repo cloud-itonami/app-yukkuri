@@ -13,7 +13,7 @@
   analogue of the Python asyncio.gather; sequential under ClojureScript).
   Copyright guardrail: a negative prompt is always attached (CLAUDE.md invariant).
   Node name `insert_assets` matches the Python `_build` wiring."
-  (:require [lg-yukkuri.compat :as compat]
+  (:require [kotoba.lang.text] [lg-yukkuri.compat :as compat]
             [json.compat :as json]
             [langgraph.graph :as g]
             [lg-yukkuri.audit :as audit]
@@ -35,7 +35,7 @@
                     {:capability :yukkuri/image-http-post})))
   (try
     (let [{:keys [image-url pds-blob-url]} (merge audit/graph-defaults host-config)
-          image-url (clojure.string/replace image-url #"/+$" "")
+          image-url (kotoba.lang.text/replace image-url #"/+$" "")
           prompt   (str "anime style background, " (:location scene) ", " (:action scene)
                         ", soft colors, 2D illustration")
           r (http-post image-url {:headers {"Content-Type" "application/json"} :throw false

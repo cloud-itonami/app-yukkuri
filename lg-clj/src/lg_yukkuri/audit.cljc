@@ -9,7 +9,7 @@
   wired only when a dispatcher URL is configured. Audit is best-effort: failures are swallowed
   (the Python wraps the post in try/except and logs a warning)."
   (:require [json.compat :as json]
-            [clojure.string :as str]))
+            [kotoba.lang.text :as str]))
 
 (def default-config
   {:dispatcher-url "http://bpmn-dispatcher.mitama-udf.svc.cluster.local:8080"

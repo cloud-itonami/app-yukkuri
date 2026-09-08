@@ -8,7 +8,7 @@
   fleet allowlist (ibuki guard pattern). The chat call itself is an INJECTABLE
   dynamic var so tests rebind it to a deterministic stub and verify offline."
   (:require [json.compat :as json]
-            [clojure.string :as str]))
+            [kotoba.lang.text :as str]))
 
 (defn- clip [s n] (let [s (str s)] (subs s 0 (min n (count s)))))
 
@@ -28,8 +28,8 @@
   [endpoint]
   (let [[_ scheme host] (or (re-find #"^([A-Za-z][A-Za-z0-9+.\-]*)://([^/?#]*)" (str endpoint))
                             [nil nil nil])]
-    (when-not (and (= "http" (some-> scheme str/lower-case))
-                   (contains? murakumo-allowed-hosts (some-> host str/lower-case)))
+    (when-not (and (= "http" (some-> scheme str/lower))
+                   (contains? murakumo-allowed-hosts (some-> host str/lower)))
       (throw (ex-info (str "inference endpoint " (pr-str endpoint)
                            " is outside the Murakumo fleet (ADR-2605215000)")
                       {:murakumo-only-violation true :endpoint endpoint})))))

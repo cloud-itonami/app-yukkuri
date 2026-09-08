@@ -3,7 +3,7 @@
   `tests/test_smoke.py`, plus node-behaviour tests the original could not run
   offline (kotoba/LLM/TTS/image/render are injectable seams here, so the full
   pipeline topology + transforms verify under bb with stubs)."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [kotoba.lang.text] [clojure.test :refer [deftest is testing]]
             [langgraph.graph :as g]
             [lg-yukkuri.compat :as compat]
             [lg-yukkuri.server :as server]
@@ -208,7 +208,7 @@
                                           :repo-did "did:web:repo.example"}})
       (is (= "did:web:explicit.example" (:owner_did @inserted)))
       (is (= "did:web:repo.example" (:repo @inserted)))
-      (is (clojure.string/starts-with? (:vertex_id @inserted)
+      (is (kotoba.lang.text/starts-with? (:vertex_id @inserted)
                                        "at://did:web:repo.example/")))))
 
 ;; ── generate_script graph: LLM stub → scenes → insert ───────────────────────

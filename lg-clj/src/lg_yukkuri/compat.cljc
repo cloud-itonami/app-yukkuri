@@ -14,7 +14,7 @@
   how the `:default nil` branches in `llm/parse-json-object` and
   `render-video/json-parse` survived -- each one was locally plausible and
   globally a silent wrong answer."
-  (:require [clojure.string :as str]))
+  (:require [kotoba.lang.text :as str]))
 
 (defn now-ms
   "Wall clock in milliseconds since the epoch. Audit object-ids derive from it."

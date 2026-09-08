@@ -12,7 +12,7 @@
   The Python fans the per-line TTS out with asyncio.gather; clj runs them via
   `compat/fan-out` (`pmap` on the JVM). Line reads/writes go through the store
   seam. DEVIATION: no RetryPolicy in langgraph-clj."
-  (:require [lg-yukkuri.compat :as compat]
+  (:require [kotoba.lang.text] [lg-yukkuri.compat :as compat]
             [json.compat :as json]
             [langgraph.graph :as g]
             [lg-yukkuri.audit :as audit]
@@ -31,7 +31,7 @@
                     {:capability :yukkuri/tts-http-post})))
   (try
     (let [{:keys [tts-url pds-blob-url voice-preset]} (merge audit/graph-defaults host-config)
-          tts-url (clojure.string/replace tts-url #"/+$" "")
+          tts-url (kotoba.lang.text/replace tts-url #"/+$" "")
           voice (get voice-preset (:speaker line) "af_heart")
           r (http-post tts-url {:headers {"Content-Type" "application/json"} :throw false
                                   :body (json/generate-string {:model "kokoro" :input (:text line)
