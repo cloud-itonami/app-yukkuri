@@ -26,7 +26,7 @@
 ;; runtimes ran and BOTH agree on how many tests and assertions there were.
 (ns run-tests
   (:require ["node:child_process" :as cp]
-            [clojure.string :as str]))
+            [kotoba.lang.text :as str]))
 
 (defn- sh [cmd args]
   (let [r (cp/spawnSync cmd (clj->js args)
