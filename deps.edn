@@ -10,7 +10,12 @@
  ;; The ClojureScript half runs from inside `lg-clj/` (see `lg-clj/run-tests.cljs`);
  ;; nbb takes a classpath rather than a deps.edn, so it has no root form.
  :paths []
- :deps {cloud-itonami/lg-yukkuri {:local/root "lg-clj"}}
+ :deps {
+        ;; kotoba.lang.text, not clojure.string. Pinned as an explicit floor:
+        ;; tools.deps takes the NEWEST sha it is shown, so without a floor here
+        ;; this repo silently rides whatever a sibling happens to name.
+        io.github.kotoba-lang/text {:git/sha "73bdb13ae7a3d004b44bca08be03a3191157a38f"}
+       cloud-itonami/lg-yukkuri {:local/root "lg-clj"}}
  :aliases
  {:test {:extra-paths ["lg-clj/test"]
          :extra-deps {io.github.cognitect-labs/test-runner

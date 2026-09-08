@@ -10,7 +10,7 @@
   `store/*insert-row*` seam. The CF Worker onCommit handler picks it up and
   drives generate_script. `insert` short-circuits when `validate` set :error."
   (:require [lg-yukkuri.compat :as compat]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [langgraph.graph :as g]
             [lg-yukkuri.audit :as audit]
             [lg-yukkuri.store :as store]))

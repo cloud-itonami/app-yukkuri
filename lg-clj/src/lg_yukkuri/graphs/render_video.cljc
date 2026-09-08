@@ -15,7 +15,7 @@
   streaming-INSERT visibility. The kotoba Datom log is read-committed (no
   streaming lag), so this port reads once with no retry loop; the assembly logic
   + the \"no scenes → error\" guard are identical. No RetryPolicy in langgraph-clj."
-  (:require [lg-yukkuri.compat :as compat]
+  (:require [kotoba.lang.text] [lg-yukkuri.compat :as compat]
             [json.compat :as json]
             [langgraph.graph :as g]
             [lg-yukkuri.audit :as audit]
@@ -40,7 +40,7 @@
     (throw (ex-info "video rendering requires an explicit HTTP POST capability"
                     {:capability :yukkuri/dougaka-http-post})))
   (try
-    (let [dougaka-url (clojure.string/replace (:dougaka-url (merge audit/graph-defaults host-config)) #"/+$" "")
+    (let [dougaka-url (kotoba.lang.text/replace (:dougaka-url (merge audit/graph-defaults host-config)) #"/+$" "")
           r (http-post (str dougaka-url "/xrpc/com.etzhayyim.apps.dougaka.render")
                   {:headers {"Content-Type" "application/json"} :throw false
                    :body (json-gen {:video_id video-id :timeline timeline})})]

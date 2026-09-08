@@ -16,7 +16,7 @@
   through the store seam."
   (:require [lg-yukkuri.compat :as compat]
             [json.compat :as json]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [langgraph.graph :as g]
             [lg-yukkuri.audit :as audit]
             [lg-yukkuri.llm :as llm]
@@ -64,7 +64,7 @@
               lines (->> (store/select-where "vertex_yukkuri_line" "video_id" video-id 100)
                          (sort-by (juxt #(as-int (:scene_index %) 0) #(as-int (:line_index %) 0)))
                          (take 40))
-              excerpt (str/join "\n" (map #(str (str/upper-case (or (:speaker %) "")) ": " (:text %)) lines))]
+              excerpt (str/join "\n" (map #(str (str/upper (or (:speaker %) "")) ": " (:text %)) lines))]
           {:topic topic :script_excerpt excerpt})
         (catch #?(:clj Exception :cljs :default) e {:error (str "fetch: " (clip (ex-message e) 180))})))))
 

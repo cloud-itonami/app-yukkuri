@@ -16,7 +16,7 @@
   `start!`/`stop!` are provided for org.httpkit.server when that dep is present.
 
   The Python FastAPI server (`lg/`) remains the DEPLOYED runtime and COEXISTS."
-  (:require [clojure.string :as str]
+  (:require [kotoba.lang.text :as str]
             [langgraph.graph :as g]
             [lg-yukkuri.compat :as compat]
             [lg-yukkuri.graphs.health :as health]
@@ -68,7 +68,7 @@
   (let [s (name s)]
     (apply str (map-indexed (fn [i ch]
                               (let [c  (str ch)
-                                    lc (str/lower-case c)]
+                                    lc (str/lower c)]
                                 (if (and (pos? i) (not= c lc))
                                   (str "_" lc)
                                   lc)))

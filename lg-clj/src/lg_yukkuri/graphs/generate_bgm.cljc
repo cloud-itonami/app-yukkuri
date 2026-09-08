@@ -13,7 +13,7 @@
   ongakuka. Topic read + asset write go through the store seam."
   (:require [lg-yukkuri.compat :as compat]
             [json.compat :as json]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [langgraph.graph :as g]
             [lg-yukkuri.audit :as audit]
             [lg-yukkuri.store :as store]))

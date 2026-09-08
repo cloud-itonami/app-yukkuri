@@ -13,7 +13,7 @@
   vLLM proxy. Topic fetch + scene/line inserts go through the injectable store
   seam (kotoba-Datom-log; RisingWave forbidden)."
   (:require [lg-yukkuri.compat :as compat]
-            [clojure.string :as str]
+            [kotoba.lang.text :as str]
             [langgraph.graph :as g]
             [lg-yukkuri.audit :as audit]
             [lg-yukkuri.llm :as llm]
