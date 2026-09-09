@@ -2,3 +2,6 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .cpcache/
+
+# nbb dependency cache -- a build artifact, not source
+.nbb/
