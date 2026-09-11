@@ -1,7 +1,7 @@
 #!/usr/bin/env nbb
 ;; The suite on nbb -- no JVM, no build step.
 ;;
-;;   nbb --classpath "src:test:$(clojure -Spath -M:test)" run-tests.cljs
+;;   nbb --classpath "src:test:$(clojure -Spath -M:test)" run-tests.cljk
 ;;
 ;; nbb does not read deps.edn, so the classpath has to be handed to it; the
 ;; `clojure -Spath` above is the only thing in this repo that still needs a

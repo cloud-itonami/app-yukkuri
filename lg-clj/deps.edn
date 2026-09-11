@@ -11,8 +11,8 @@
  ;; and so the ClojureScript half of every reader conditional here was dead
  ;; code no runtime had ever loaded. It did not load: see `lg-yukkuri.compat`.
  ;;
- ;; Two runtimes, one suite (`run-tests.cljs` explains the split):
- ;;   nbb --classpath "src:test:$(clojure -Spath -M:test)" run-tests.cljs
+ ;; Two runtimes, one suite (`run-tests.cljk` explains the split):
+ ;;   nbb --classpath "src:test:$(clojure -Spath -M:test)" run-tests.cljk
  ;;   clojure -M:test
  :paths ["src"]
 

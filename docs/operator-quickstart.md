@@ -49,7 +49,7 @@ git worktree add -b <branch> /tmp/<name> cloud-itonami/main
 ## 2. clj twin のテストを通す（いちばん短い緑）
 
 ```bash
-nbb run-tests.cljs          # repo ルートで。両方の runtime を回す
+nbb run-tests.cljk          # repo ルートで。両方の runtime を回す
 ```
 
 実測 2026-09-01:
@@ -74,10 +74,10 @@ cljs では load すらできなかった。より悪いのは load できた 2 
 
 ```bash
 clojure -M:test                                                    # JVM だけ
-cd lg-clj && nbb --classpath "src:test:$(clojure -Spath -M:test)" run-tests.cljs   # cljs だけ
+cd lg-clj && nbb --classpath "src:test:$(clojure -Spath -M:test)" run-tests.cljk   # cljs だけ
 ```
 
-`lg-clj/run-tests.cljs` は **3 値の exit** を返す（0 = 全部通った / 1 = 落ちた /
+`lg-clj/run-tests.cljk` は **3 値の exit** を返す（0 = 全部通った / 1 = 落ちた /
 2 = REFUSED、走った本数が既知の本数に足りない）。走らなかった実行を緑と
 区別できるようにするため。
 
@@ -209,11 +209,11 @@ WebCrypto の `getRandomValues` で、**どちらも CSPRNG**——store は rke
   この依存を迂回している。
 - ~~`lg-clj` は `bb`（babashka）で回る。~~ **2026-09-01 に移行済み**
   （ADR-2607173000）。`bb.edn` と `run_tests.clj` は撤去し、`lg-clj/deps.edn` +
-  `lg-clj/run-tests.cljs`（nbb）+ ルートの `run-tests.cljs`（両方を回して
+  `lg-clj/run-tests.cljk`（nbb）+ ルートの `run-tests.cljk`（両方を回して
   一致を要求する）に置き換えた。`run_tests.clj` は本番の capability 配線
   （`with-capabilities`）をテストの入口に置き、しかも `run_tests.clj` という
   ファイルから `ns lg-yukkuri.host` を宣言していた（`load-file` だけが許す
-  不一致）。配線は `lg-clj/src/lg_yukkuri/host.cljc` に移し、`http-post` を
+  不一致）。配線は `lg-clj/src/lg_yukkuri/host.cljk` に移し、`http-post` を
   引数に取るので runtime を名指ししなくなった。
 
 ---

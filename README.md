@@ -12,7 +12,7 @@ headless render → mp4/webm。1 本の動画 = 1 project で、台本・声・�
 ## まず動かす → [`docs/operator-quickstart.md`](docs/operator-quickstart.md)
 
 初めて開いた人が 1 つ何かを動かすまでの手順。**実際に踏んだ結果だけ**が書いてあり、
-踏めなかったものは未検証として分けてある。最短の緑は repo ルートで `nbb run-tests.cljs`
+踏めなかったものは未検証として分けてある。最短の緑は repo ルートで `nbb run-tests.cljk`
 （実測 2026-09-01: JVM と ClojureScript の両方で 44 tests / 141 assertions、
 両者が一致しなければ落ちる）。
 

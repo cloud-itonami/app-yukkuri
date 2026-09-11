@@ -7,7 +7,7 @@
  ;;   clojure -M:test                       the whole suite, JVM
  ;;   cd lg-clj && clojure -M:test          the same, from inside the tree
  ;;
- ;; The ClojureScript half runs from inside `lg-clj/` (see `lg-clj/run-tests.cljs`);
+ ;; The ClojureScript half runs from inside `lg-clj/` (see `lg-clj/run-tests.cljk`);
  ;; nbb takes a classpath rather than a deps.edn, so it has no root form.
  :paths []
  :deps {
