@@ -1,12 +1,12 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; Run the lg-clj suite on BOTH runtimes and require them to agree.
 ;;
-;;   nbb run-tests.cljk
+;;   kbb --backend sci run-tests.cljk
 ;;
 ;; WHY BOTH, AND WHY IN ONE COMMAND.
 ;;
 ;; Every source file under `lg-clj/src` is `.cljc`, and until 2026-09-01
-;; exactly one runtime had ever loaded them: `bb test`, on a JVM. The
+;; exactly one runtime had ever loaded them: `kbb -M:test`, on a JVM. The
 ;; ClojureScript branch of every reader conditional was unexecuted, and
 ;; `lg-yukkuri.audit` did not even compile there. Worse than the ones that
 ;; failed to load were the two that loaded and lied:
@@ -41,7 +41,7 @@
   (when-let [[_ n m] (re-find #"Ran (\d+) tests containing (\d+) assertions" out)]
     [(parse-long n) (parse-long m)]))
 
-(println "── JVM (clojure -M:test) ─────────────────────────────────────────")
+(println "── JVM (kbb -M:test) ─────────────────────────────────────────")
 (def jvm (sh "clojure" ["-M:test"]))
 (println (:out jvm))
 

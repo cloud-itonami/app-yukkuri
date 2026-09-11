@@ -4,7 +4,7 @@
   Until 2026-09-01 every namespace here carried a `.cljc` suffix and reached
   for `System/currentTimeMillis`, `java.time.*`, `Integer/parseInt` and
   `(.getName (class e))` without a reader conditional, so the sources claimed
-  a portability no runtime had ever checked -- `bb test` was the only thing
+  a portability no runtime had ever checked -- `kbb -M:test` was the only thing
   that ever ran them and babashka is a JVM. Loading `lg-yukkuri.audit` under
   ClojureScript failed outright.
 

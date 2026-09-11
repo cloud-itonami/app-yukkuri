@@ -49,7 +49,7 @@ git worktree add -b <branch> /tmp/<name> cloud-itonami/main
 ## 2. clj twin のテストを通す（いちばん短い緑）
 
 ```bash
-nbb run-tests.cljk          # repo ルートで。両方の runtime を回す
+kbb --backend sci run-tests.cljk          # repo ルートで。両方の runtime を回す
 ```
 
 実測 2026-09-01:
@@ -62,7 +62,7 @@ lg-yukkuri: both runtimes agree -- 44 tests, 141 assertions, 0 failures, 0 error
 `json` を git SHA で pin しているので、初回だけ git fetch が走る。
 
 **なぜ 2 つ回すのか。** src は全部 `.cljc` だが、2026-09-01 まで**それを読んだ
-runtime は 1 つだけ**だった（`bb test`、babashka は JVM）。だから reader
+runtime は 1 つだけ**だった（`kbb -M:test`、babashka は JVM）。だから reader
 conditional の ClojureScript 側は一度も評価されておらず、`lg-yukkuri.audit` は
 cljs では load すらできなかった。より悪いのは load できた 2 つで、
 `llm/parse-json-object` と `render-video/json-parse` は `:default nil` を返す
@@ -73,8 +73,8 @@ cljs では load すらできなかった。より悪いのは load できた 2 
 片方ずつ回したいときは:
 
 ```bash
-clojure -M:test                                                    # JVM だけ
-cd lg-clj && nbb --classpath "src:test:$(clojure -Spath -M:test)" run-tests.cljk   # cljs だけ
+kbb -M:test                                                    # JVM だけ
+cd lg-clj && kbb --backend sci --classpath "src:test:$(kbb -Spath -M:test)" run-tests.cljk   # cljs だけ
 ```
 
 `lg-clj/run-tests.cljk` は **3 値の exit** を返す（0 = 全部通った / 1 = 落ちた /
@@ -141,7 +141,7 @@ cat > /tmp/probe.cljs <<'EOF'
   (prn :health  (server/dispatch-xrpc "com.etzhayyim.apps.yukkuri.health" {}))
   (prn :unknown (server/dispatch-xrpc "com.etzhayyim.apps.yukkuri.nope" {})))
 EOF
-nbb --classpath "lg-clj/src:$(clojure -Spath -M:test)" /tmp/probe.cljs
+kbb --backend sci --classpath "lg-clj/src:$(kbb -Spath -M:test)" /tmp/probe.cljs
 ```
 
 実測 2026-09-01、nbb で（抜粋）:
@@ -169,7 +169,7 @@ cat > /tmp/probe-compose.cljs <<'EOF'
   (prn :blank (server/dispatch-xrpc "com.etzhayyim.apps.yukkuri.compose" {"topic" "  "})))
 (prn :rows (count @written))
 EOF
-nbb --classpath "lg-clj/src:$(clojure -Spath -M:test)" /tmp/probe-compose.cljs
+kbb --backend sci --classpath "lg-clj/src:$(kbb -Spath -M:test)" /tmp/probe-compose.cljs
 ```
 
 実測 2026-09-01、nbb で: 1 本目が `:video_id "video-75e17fa1f5a9"` を返し、2 本目が
