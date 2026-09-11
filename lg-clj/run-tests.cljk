@@ -1,15 +1,15 @@
-#!/usr/bin/env nbb
+#!/usr/bin/env kbb
 ;; The suite on nbb -- no JVM, no build step.
 ;;
-;;   nbb --classpath "src:test:$(clojure -Spath -M:test)" run-tests.cljk
+;;   kbb --backend sci --classpath "src:test:$(kbb -Spath -M:test)" run-tests.cljk
 ;;
 ;; nbb does not read deps.edn, so the classpath has to be handed to it; the
-;; `clojure -Spath` above is the only thing in this repo that still needs a
+;; `kbb -Spath` above is the only thing in this repo that still needs a
 ;; JVM, and only to resolve three git coordinates. On the fleet that is what
 ;; `:ship-git-deps true` supplies.
 ;;
 ;; WHY A SECOND RUNNER EXISTS. Every source file here is `.cljc` and until
-;; 2026-09-01 exactly one runtime had ever loaded them: `bb test`, on a JVM.
+;; 2026-09-01 exactly one runtime had ever loaded them: `kbb -M:test`, on a JVM.
 ;; The ClojureScript branch of every reader conditional was therefore
 ;; unexecuted, and two of them were wrong in the worst available way --
 ;; `llm/parse-json-object` and `render-video/json-parse` returned `nil` under

@@ -6,14 +6,14 @@
  ;;
  ;; This file replaces the `bb.edn` that used to hold the same two dependencies.
  ;; ADR-2607173000 retired babashka as this workspace's script host, and the
- ;; practical cost of staying on it was concrete rather than stylistic: `bb test`
+ ;; practical cost of staying on it was concrete rather than stylistic: `kbb -M:test`
  ;; was the ONLY thing that ever ran these `.cljc` sources, babashka is a JVM,
  ;; and so the ClojureScript half of every reader conditional here was dead
  ;; code no runtime had ever loaded. It did not load: see `lg-yukkuri.compat`.
  ;;
  ;; Two runtimes, one suite (`run-tests.cljk` explains the split):
- ;;   nbb --classpath "src:test:$(clojure -Spath -M:test)" run-tests.cljk
- ;;   clojure -M:test
+ ;;   kbb --backend sci --classpath "src:test:$(kbb -Spath -M:test)" run-tests.cljk
+ ;;   kbb -M:test
  :paths ["src"]
 
  ;; Pinned at each upstream default branch tip, verified reachable 2026-09-01.

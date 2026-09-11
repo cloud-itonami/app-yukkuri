@@ -73,7 +73,7 @@ not need to reproduce to be faithful to the registered graph set.
 ## Run
 
 ```bash
-nbb run-tests.cljk          # from the REPO ROOT: both runtimes, and they must agree
+kbb --backend sci run-tests.cljk          # from the REPO ROOT: both runtimes, and they must agree
 ```
 
 → `lg-yukkuri: both runtimes agree -- 44 tests, 141 assertions, 0 failures, 0 errors`
@@ -81,12 +81,12 @@ nbb run-tests.cljk          # from the REPO ROOT: both runtimes, and they must a
 One runtime at a time:
 
 ```bash
-clojure -M:test                                                     # JVM
-nbb --classpath "src:test:$(clojure -Spath -M:test)" run-tests.cljk # ClojureScript (from lg-clj/)
+kbb -M:test                                                     # JVM
+kbb --backend sci --classpath "src:test:$(kbb -Spath -M:test)" run-tests.cljk # ClojureScript (from lg-clj/)
 ```
 
 Both must run, because every file here is `.cljc` and until 2026-09-01 only
-one runtime had ever loaded them. `bb test` was the suite, babashka is a JVM,
+one runtime had ever loaded them. `kbb -M:test` was the suite, babashka is a JVM,
 and so the ClojureScript branch of every reader conditional was dead code.
 It did not work: `lg-yukkuri.audit` used `json/generate-string` outside the
 `#?(:clj ...)` that required it and would not compile; `compose`,

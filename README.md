@@ -12,7 +12,7 @@ headless render → mp4/webm。1 本の動画 = 1 project で、台本・声・�
 ## まず動かす → [`docs/operator-quickstart.md`](docs/operator-quickstart.md)
 
 初めて開いた人が 1 つ何かを動かすまでの手順。**実際に踏んだ結果だけ**が書いてあり、
-踏めなかったものは未検証として分けてある。最短の緑は repo ルートで `nbb run-tests.cljk`
+踏めなかったものは未検証として分けてある。最短の緑は repo ルートで `kbb --backend sci run-tests.cljk`
 （実測 2026-09-01: JVM と ClojureScript の両方で 44 tests / 141 assertions、
 両者が一致しなければ落ちる）。
 
@@ -32,7 +32,7 @@ Python と clj は **coexist** する設計で、clj 側は Python を消さな�
 （ADR-2606280030）。移植の忠実性と意図的な逸脱は `lg-clj/README.md` が全部書いている。
 
 `lg-clj/` の src は全部 `.cljc` で、**JVM と ClojureScript の両方で走る**。
-2026-09-01 まではそうではなかった —— 走らせていたのは `bb test` だけで babashka は
+2026-09-01 まではそうではなかった —— 走らせていたのは `kbb -M:test` だけで babashka は
 JVM なので、reader conditional の cljs 側は一度も評価されていなかった。実際
 `lg-yukkuri.audit` は cljs では load すらできず、`llm/parse-json-object` と
 `render-video/json-parse` は `#?(:clj ... :default nil)` で**どんな入力にも nil を

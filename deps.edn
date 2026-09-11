@@ -4,8 +4,8 @@
  ;; `lg-clj/deps.edn`; this file reaches them through `:local/root` rather than
  ;; restating them, so there is exactly one place a dependency sha is written.
  ;;
- ;;   clojure -M:test                       the whole suite, JVM
- ;;   cd lg-clj && clojure -M:test          the same, from inside the tree
+ ;;   kbb -M:test                       the whole suite, JVM
+ ;;   cd lg-clj && kbb -M:test          the same, from inside the tree
  ;;
  ;; The ClojureScript half runs from inside `lg-clj/` (see `lg-clj/run-tests.cljk`);
  ;; nbb takes a classpath rather than a deps.edn, so it has no root form.
