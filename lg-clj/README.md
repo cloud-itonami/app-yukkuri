@@ -73,7 +73,7 @@ not need to reproduce to be faithful to the registered graph set.
 ## Run
 
 ```bash
-nbb run-tests.cljs          # from the REPO ROOT: both runtimes, and they must agree
+nbb run-tests.cljk          # from the REPO ROOT: both runtimes, and they must agree
 ```
 
 → `lg-yukkuri: both runtimes agree -- 44 tests, 141 assertions, 0 failures, 0 errors`
@@ -82,7 +82,7 @@ One runtime at a time:
 
 ```bash
 clojure -M:test                                                     # JVM
-nbb --classpath "src:test:$(clojure -Spath -M:test)" run-tests.cljs # ClojureScript (from lg-clj/)
+nbb --classpath "src:test:$(clojure -Spath -M:test)" run-tests.cljk # ClojureScript (from lg-clj/)
 ```
 
 Both must run, because every file here is `.cljc` and until 2026-09-01 only

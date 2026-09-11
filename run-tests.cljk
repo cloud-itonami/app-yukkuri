@@ -1,7 +1,7 @@
 #!/usr/bin/env nbb
 ;; Run the lg-clj suite on BOTH runtimes and require them to agree.
 ;;
-;;   nbb run-tests.cljs
+;;   nbb run-tests.cljk
 ;;
 ;; WHY BOTH, AND WHY IN ONE COMMAND.
 ;;
@@ -54,7 +54,7 @@
 (println "── ClojureScript (nbb) ───────────────────────────────────────────")
 (def cljs-res
   (sh "nbb" ["--classpath" (str "lg-clj/src:lg-clj/test:" (str/trim (:out cp-res)))
-             "lg-clj/run-tests.cljs"]))
+             "lg-clj/run-tests.cljk"]))
 (println (:out cljs-res))
 
 (let [jc (counts (:out jvm))
