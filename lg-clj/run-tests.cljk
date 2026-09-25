@@ -32,7 +32,7 @@
 ;; then refused with "nil tests ran" -- the floor caught its own plumbing,
 ;; which is the only reason it is written this way rather than the obvious way.
 (ns run-tests
-  (:require [clojure.test :as t]
+  (:require [kotoba.test :as t]
             [lg-yukkuri.smoke-test]))
 
 (def ^:private minimum-tests
