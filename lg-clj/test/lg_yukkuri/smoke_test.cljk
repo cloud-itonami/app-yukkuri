@@ -475,17 +475,17 @@
             sv/*tts-one* nil
             rev/*social-publish* nil
             rv/*render* nil]
-    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs :default) #"explicit chat capability"
+    (is (thrown-with-msg? :default #"explicit chat capability"
                           (llm/chat-json "s" "u" {})))
-    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs :default) #"explicit compose capability"
+    (is (thrown-with-msg? :default #"explicit compose capability"
                           (gbgm/node-compose-bgm {:topic "t"})))
-    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs :default) #"explicit generation capability"
+    (is (thrown-with-msg? :default #"explicit generation capability"
                           (gvis/node-generate {:scenes [{}]})))
-    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs :default) #"explicit TTS capability"
+    (is (thrown-with-msg? :default #"explicit TTS capability"
                           (sv/node-synthesize {:lines [{}]})))
-    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs :default) #"explicit social capability"
+    (is (thrown-with-msg? :default #"explicit social capability"
                           (rev/node-social-publish {:review_passed true})))
-    (is (thrown-with-msg? #?(:clj clojure.lang.ExceptionInfo :cljs :default) #"explicit render capability"
+    (is (thrown-with-msg? :default #"explicit render capability"
                           (rv/node-render {:video_id "v" :timeline_json "{}"})))))
 
 ;; ── audit shim: injectable + disabled ───────────────────────────────────────
