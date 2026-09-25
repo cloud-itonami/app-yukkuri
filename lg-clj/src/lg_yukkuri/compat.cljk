@@ -14,7 +14,7 @@
   how the `:default nil` branches in `llm/parse-json-object` and
   `render-video/json-parse` survived -- each one was locally plausible and
   globally a silent wrong answer."
-  (:require [kotoba.lang.text :as str]))
+  (:require [kotoba.bytes :as kbytes] [kotoba.lang.text :as str]))
 
 (defn now-ms
   "Wall clock in milliseconds since the epoch. Audit object-ids derive from it."
@@ -70,7 +70,7 @@
   `http-post` as `:body`, which is what `generate-visual` does with the
   `b64_json` an image model returns."
   [s]
-  #?(:clj (.decode (java.util.Base64/getDecoder) ^String s)
+  #?(:clj (kbytes/base64-decode-bytes ^String s)
      :cljs (if (exists? js/Buffer)
              (js/Buffer.from s "base64")
              (let [bin (js/atob s)
