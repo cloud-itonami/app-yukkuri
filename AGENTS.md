@@ -1,6 +1,6 @@
 # etzhayyim-project-yukkuri — ゆっくり実況 (AI Yukkuri Video Generation)
 
-共通ルールは `60-apps/CLAUDE.md` を参照。
+共通ルールは `60-apps/AGENTS.md` を参照。
 
 ## Overview
 

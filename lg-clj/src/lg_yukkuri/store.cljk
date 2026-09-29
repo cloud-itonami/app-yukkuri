@@ -4,7 +4,7 @@
   (ADR-2606280030).
 
   The Python nodes call `client.select_where` / `client.insert_row` / `client.q`.
-  Per CLAUDE.md the canonical state is the kotoba Datom log and the substrate
+  Per AGENTS.md the canonical state is the kotoba Datom log and the substrate
   boundary FORBIDS RisingWave; so rather than reproduce psycopg/RW this port
   exposes the three operations as DYNAMIC VARS that default to an unconfigured
   no-op store. The deployment layer rebinds them to a real kotoba `:db-api`
