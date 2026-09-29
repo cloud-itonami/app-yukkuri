@@ -11,7 +11,7 @@
   (murakumo image endpoint + PDS uploadBlob); default uses babashka.http-client.
   Per-scene generation fans out via `compat/fan-out` (`pmap` on the JVM, the
   analogue of the Python asyncio.gather; sequential under ClojureScript).
-  Copyright guardrail: a negative prompt is always attached (CLAUDE.md invariant).
+  Copyright guardrail: a negative prompt is always attached (AGENTS.md invariant).
   Node name `insert_assets` matches the Python `_build` wiring."
   (:require [kotoba.lang.text] [lg-yukkuri.compat :as compat]
             [json.compat :as json]

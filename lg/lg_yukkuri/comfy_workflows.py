@@ -34,7 +34,7 @@ NEG_DEFAULT = (
 )
 
 # Yukkuri voice-actor sub-DID display names. Independent of東方 IP — these are
-# etzhayyim original characters. Names mirror CLAUDE.md "ゆきり / まりり" convention.
+# etzhayyim original characters. Names mirror AGENTS.md "ゆきり / まりり" convention.
 LEFT_CHARACTER_DEFAULT = "ゆきり"   # Reimu-like, calm
 RIGHT_CHARACTER_DEFAULT = "まりり"  # Marisa-like, energetic
 

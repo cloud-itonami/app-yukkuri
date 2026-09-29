@@ -36,7 +36,7 @@ each ns; tests rebind to stubs so the whole pipeline verifies offline under bb):
 
 - **Persistence** → `store/*select-where*` `*insert-row*` `*query*`. The Python
   reaches `kotodama.kotoba_datomic`; this is the single kotoba-Datom-log seam.
-  RisingWave is **not** reproduced (substrate boundary forbids it per CLAUDE.md;
+  RisingWave is **not** reproduced (substrate boundary forbids it per AGENTS.md;
   the Python's RW psycopg path maps onto this seam).
 - **LLM** (scriptwriter + critic) → `llm/*chat-json*`, defaulting to the
   **Murakumo loopback gateway** (`http://127.0.0.1:4000/v1`) with a fleet

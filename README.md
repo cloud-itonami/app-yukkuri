@@ -7,7 +7,7 @@ production service としては `cloud-itonami/yukkuri`、公開 handle は
 
 トピック → L/R 掛け合い台本 → TTS 音声 → 生成画像 / SFX → BGM →
 headless render → mp4/webm。1 本の動画 = 1 project で、台本・声・絵・効果音・
-編集・批評をそれぞれ別の actor DID が担当する構成（詳細は `CLAUDE.md`）。
+編集・批評をそれぞれ別の actor DID が担当する構成（詳細は `AGENTS.md`）。
 
 ## まず動かす → [`docs/operator-quickstart.md`](docs/operator-quickstart.md)
 
@@ -58,7 +58,7 @@ graph を通せる。seam は 11 個で、**graph 固有のものがある**
 
 ## 他の入口
 
-- `CLAUDE.md` — 設計の正本（actor 構成 / domain model / XRPC / 表現と著作権の
+- `AGENTS.md` — 設計の正本（actor 構成 / domain model / XRPC / 表現と著作権の
   不変条件）。**到達目標を含む**ので、現在地は本 README と quickstart を見る。
 - `lg-clj/README.md` — 移植仕様（graph ごとの topology、Python からの逸脱）。
 - `README.edn` — 機械可読な境界宣言（`etzhayyim.repository/readme-v1`）。
